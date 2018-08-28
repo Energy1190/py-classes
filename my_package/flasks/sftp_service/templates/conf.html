@@ -1,0 +1,329 @@
+{% extends "base.html" %}
+{% block title %}Настройка{% endblock %}
+{% block script %}
+{% endblock %}
+{% block content %}
+<div class="container">
+    <div class="card bg-primary text-white mt-5">
+        <div class="card-header">Cтатус.</div>
+        <div class="card-body">
+            <div class="row" id="status-div">
+            </div>
+        </div>
+    </div>
+    <div class="card bg-primary text-white mt-5">
+        <div class="card-header">Команды.</div>
+        <div class="card-body">
+            <div id="cmd-messenger"></div>
+            <div class="row">
+                <div class="col-sm">
+                    <button type="button" class="btn btn-success" id="init-conf" onclick="initConfig()">Инициализировать</button>
+                </div>
+                <div class="col-sm">
+                    <button type="button" class="btn btn-success" id="smart-sync" onclick="forceSync('/api/v1/sync')">Синхронизировать</button>
+                </div>
+                <div class="col-sm">
+                    <button type="button" class="btn btn-success" id="clean-sync" onclick="forceSync('/api/v1/clean')">Чистая синхронизация</button>
+                </div>
+                <div class="col-sm" id="connect-btn">
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="card bg-primary text-white mt-5">
+        <div class="card-header">Отправить конфигурацию.</div>
+        <div class="card-body">
+            <div id="messenger"></div>
+            <form class="form-horizontal reservation_form" id="confForm" name="confForm">
+              <div class="form-group">
+                  <label for="InputHost">Server name</label>
+                  <input class="form-control" id="InputHost" name="InputHost" form="confForm" placeholder="Enter server name">
+              </div>
+              <div class="form-group">
+                  <label for="InputPort">Server port</label>
+                  <input class="form-control" id="InputPort" name="InputPort" form="confForm" placeholder="Enter server port">
+              </div>
+              <div class="form-group">
+                  <label for="InputLogin">Auth Login</label>
+                  <input class="form-control" id="InputLogin" name="InputLogin" form="confForm" placeholder="Enter login">
+              </div>
+              <div class="form-group">
+                  <label for="InputPassword">Auth Password</label>
+                  <input type="password" class="form-control" name="InputPassword" form="confForm" id="InputPassword" placeholder="Enter password">
+              </div>
+              <button class="btn btn-success">Submit</button>
+            </form>
+        </div>
+    </div>
+</div>
+<script type="text/javascript">
+$('#confForm').submit(function(e){
+    $.ajax({
+        url:'/api/v1/conf',
+        type:'post',
+        data:$('#confForm').serialize(),
+        success:function(result){
+            var node = document.createElement("div");
+            if (!result['validate'] && result['status']) {
+                node.className = "alert alert-success";
+                var textnode = document.createTextNode("Конфигурация загружена.");
+            } else {
+                node.className = "alert alert-danger";
+                var textnode = document.createTextNode("Конфигурация отклонена.");
+            }
+            node.appendChild(textnode);
+            document.getElementById("messenger").appendChild(node);
+            setTimeout(function(){
+                var myNode = document.getElementById("messenger");
+                while (myNode.firstChild) {
+                    myNode.removeChild(myNode.firstChild);
+                }
+            }, 5000);
+        }
+    });
+    e.preventDefault();
+});
+
+function initConfig() {
+    $.ajax({
+        url:'/api/v1/init',
+        type:'post',
+        success:function(result){
+            var node = document.createElement("div");
+            if (result['status']) {
+                node.className = "alert alert-success";
+                var textnode = document.createTextNode("Конфигурация инициализирована.");
+            } else {
+                node.className = "alert alert-danger";
+                var textnode = document.createTextNode("Конфигурация не инициализирована.");
+            }
+            node.appendChild(textnode);
+            document.getElementById("cmd-messenger").appendChild(node);
+            setTimeout(function(){
+                var myNode = document.getElementById("cmd-messenger");
+                while (myNode.firstChild) {
+                    myNode.removeChild(myNode.firstChild);
+                }
+            }, 5000);
+        }
+    });
+}
+
+function forceSync(syncUrl) {
+    $.ajax({
+        url:syncUrl,
+        type:'post',
+        success:function(result){
+            var node = document.createElement("div");
+            if (!result['error_status']) {
+                node.className = "alert alert-success";
+                var textnode = document.createTextNode("Синхронизация прошла успешно.");
+            } else {
+                node.className = "alert alert-danger";
+                var textnode = document.createTextNode("Синхронизация не удалась.");
+            }
+            node.appendChild(textnode);
+            document.getElementById("cmd-messenger").appendChild(node);
+            setTimeout(function(){
+                var myNode = document.getElementById("cmd-messenger");
+                while (myNode.firstChild) {
+                    myNode.removeChild(myNode.firstChild);
+                }
+            }, 5000);
+        }
+    });
+}
+
+function getStatus () {
+    $.ajax({
+        url:'/api/v1/status',
+        type:'get',
+        success:function(result){
+            var myNode = document.getElementById("status-div");
+            while (myNode.firstChild) {
+                myNode.removeChild(myNode.firstChild);
+            }
+            var node = document.createElement("div");
+            node.className = "col-sm";
+            node.setAttribute('id', 'config-status');
+            document.getElementById("status-div").appendChild(node);
+
+            var node = document.createElement("div");
+            var header = document.createElement("div");
+            var body = document.createElement("div");
+            body.className = "card-body"
+            header.className = "card-header"
+            var textnode = document.createTextNode("Состояние настройки.");
+            header.appendChild(textnode);
+            if (result['config']['status']) {
+                node.className = "card text-white bg-success mb-3"
+                node.setAttribute('id', 'config-status-card');
+                var textnode = document.createTextNode("Конфигурация инициализирована.");
+                body.appendChild(textnode);
+
+                var pnode = document.createElement("p");
+                var textnode = document.createTextNode("Дата: " + result['config']['time']);
+                pnode.appendChild(textnode);
+                body.appendChild(pnode);
+            } else {
+                node.className = "card text-white bg-danger mb-3"
+                var textnode = document.createTextNode("Конфигурация не инициализирована.");
+                body.appendChild(textnode);
+            }
+
+            document.getElementById('config-status').appendChild(node);
+            node.appendChild(header);
+            node.appendChild(body);
+
+            var node = document.createElement("div");
+            node.className = "col-sm";
+            node.setAttribute('id', 'connect-status');
+            document.getElementById("status-div").appendChild(node);
+
+            var node = document.createElement("div");
+            var header = document.createElement("div");
+            var body = document.createElement("div");
+            body.className = "card-body"
+            header.className = "card-header"
+            var textnode = document.createTextNode("Состояние соединения.");
+            header.appendChild(textnode);
+            if (result['connect']['status']) {
+                node.className = "card text-white bg-success mb-3"
+                node.setAttribute('id', 'connect-status-card');
+                var textnode = document.createTextNode("Соединен.");
+                body.appendChild(textnode);
+
+                var pnode = document.createElement("p");
+                var textnode = document.createTextNode(result['connect']['time'] + " секунд.");
+                pnode.appendChild(textnode);
+                body.appendChild(pnode);
+            } else {
+                node.className = "card text-white bg-danger mb-3"
+                var textnode = document.createTextNode("Не соединен.");
+                body.appendChild(textnode);
+            }
+
+            document.getElementById('connect-status').appendChild(node);
+            node.appendChild(header);
+            node.appendChild(body);
+
+            var node = document.createElement("div");
+            node.className = "col-sm";
+            node.setAttribute('id', 'sync-status');
+            document.getElementById("status-div").appendChild(node);
+
+            var node = document.createElement("div");
+            var header = document.createElement("div");
+            var body = document.createElement("div");
+            body.className = "card-body"
+            header.className = "card-header"
+            var textnode = document.createTextNode("Состояние синхронизаии.");
+            header.appendChild(textnode);
+            if (!result['sync']['status']) {
+                node.className = "card text-white bg-success mb-3"
+                node.setAttribute('id', 'config-status-card');
+                var textnode = document.createTextNode("Синхронизирован.");
+                body.appendChild(textnode);
+
+                var pnode = document.createElement("p");
+                var textnode = document.createTextNode("Дата: " + result['config']['time']);
+                pnode.appendChild(textnode);
+                body.appendChild(pnode);
+            } else {
+                node.className = "card text-white bg-danger mb-3"
+                var textnode = document.createTextNode("Синхронизаций не обнаружено. Ошибка синхронизации.");
+                body.appendChild(textnode);
+            }
+
+            document.getElementById('sync-status').appendChild(node);
+            node.appendChild(header);
+            node.appendChild(body);
+        }
+    });
+}
+
+function disconnect() {
+    $.ajax({
+        url:'/api/v1/disconnect',
+        type:'post',
+        success:function(result){
+            var node = document.createElement("div");
+            if (!result['status']) {
+                node.className = "alert alert-success";
+                var textnode = document.createTextNode("Отсоединен от сервера.");
+            } else {
+                node.className = "alert alert-danger";
+                var textnode = document.createTextNode("Ошибка. Не удалось отсоединиться.");
+            }
+            node.appendChild(textnode);
+            document.getElementById("cmd-messenger").appendChild(node);
+            getConnection();
+            setTimeout(function(){
+                var myNode = document.getElementById("cmd-messenger");
+                while (myNode.firstChild) {
+                    myNode.removeChild(myNode.firstChild);
+                }
+            }, 5000);
+        }
+    });
+}
+
+function connect() {
+    $.ajax({
+        url:'/api/v1/connect',
+        type:'post',
+        success:function(result){
+            var node = document.createElement("div");
+            if (result['status']) {
+                node.className = "alert alert-success";
+                var textnode = document.createTextNode("Соединен с сервером.");
+            } else {
+                node.className = "alert alert-danger";
+                var textnode = document.createTextNode("Ошибка. Не удалось соединиться.");
+            }
+            node.appendChild(textnode);
+            document.getElementById("cmd-messenger").appendChild(node);
+            getConnection();
+            setTimeout(function(){
+                var myNode = document.getElementById("cmd-messenger");
+                while (myNode.firstChild) {
+                    myNode.removeChild(myNode.firstChild);
+                }
+            }, 5000);
+        }
+    });
+}
+
+function getConnection () {
+    $.ajax({
+        url:'/api/v1/sconnect',
+        type:'get',
+        success:function(result){
+            var myNode = document.getElementById("connect-btn");
+            while (myNode.firstChild) {
+                myNode.removeChild(myNode.firstChild);
+            }
+            var node = document.createElement("button");
+            if (result['status']) {
+                node.className = "btn btn-danger"
+                node.setAttribute('onclick', 'disconnect()');
+                var textnode = document.createTextNode("Разъединить");
+            } else {
+                node.className = "btn btn-success"
+                node.setAttribute('onclick', 'connect()');
+                var textnode = document.createTextNode("Соединить");
+            }
+            node.appendChild(textnode);
+            document.getElementById("connect-btn").appendChild(node);
+        }
+    });
+}
+
+getStatus();
+getConnection();
+
+setInterval(getStatus, 30000);
+setInterval(getConnection, 30000);
+</script>
+
+{% endblock %}

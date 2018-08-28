@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}Список покупок{% endblock %}
+{% block script%}
+<script>
+    function delete_position(num) {
+        var siteUrl = window.location.origin;
+        var requestToDelete = new XMLHttpRequest();
+        var removeURL = siteUrl + "/" + num + "/remove"
+        requestToDelete.open( "GET", removeURL);
+        requestToDelete.send( null );
+        location.reload();
+    }
+</script>
+{% endblock %}
+{% block content %}
+<div class="jumbotron jumbotron-fluid">
+    <div class="container">
+        <h1 class="display-6">Список покупок.</h1>
+    </div>
+</div>
+
+<div class="w3-padding w3-white notranslate">
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>№</th>
+                <th>Дата</th>
+                <th>Название</th>
+                <th>Кол-во</th>
+                <th>Цена</th>
+                <th>Описание</th>
+                <th>Причины</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for i in positions %}
+            <tr>
+                {% for p in i %}
+                <td> {{ p }}</td>
+                {% endfor %}
+                <td>
+                    <table>
+                        <tr><a href="/{{ i[0] }}" role="button" class="btn btn-lg btn-block btn-info" id="detail">Подробно</a></tr>
+                        <tr><button type="button" class="btn btn-lg btn-block btn-danger" id="remove" onclick="delete_position({{ i[0] }})">Удалить</button></tr>
+                    </table>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<form action="/" method="POST">
+    <h4>Добавить запись.</h4>
+    <div class="w3-padding w3-white notranslate">
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>№</th>
+                    <th>Дата</th>
+                    <th>Название</th>
+                    <th>Кол-во</th>
+                    <th>Цена</th>
+                    <th>Описание</th>
+                    <th>Причины</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><input type="text" class="form-control" id="number" name="number"></td>
+                    <td><input type="text" class="form-control" id="date" name="date"></td>
+                    <td><input type="text" class="form-control" id="name" name="name"></td>
+                    <td><input type="text" class="form-control" id="count" name="count"></td>
+                    <td><input type="text" class="form-control" id="cost" name="cost"></td>
+                    <td><input type="text" class="form-control" id="desctiption" name="desctiption"></td>
+                    <td><input type="text" class="form-control" id="solution" name="solution"></td>
+                    <td>
+                        <button type="submit" class="btn btn-lg btn-block btn-success" id="submit">Добавить</button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</form>
+{% endblock %}

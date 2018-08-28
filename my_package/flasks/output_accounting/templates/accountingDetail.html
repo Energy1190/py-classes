@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Подробно{% endblock %}
+{% block content %}
+<div class="jumbotron jumbotron-fluid">
+    <div class="container">
+        <h1 class="display-6"> {{ data[2] }} </h1>
+    </div>
+</div>
+
+<div class="w3-padding w3-white notranslate">
+    <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>№</th>
+                    <th>Дата</th>
+                    <th>Название</th>
+                    <th>Кол-во</th>
+                    <th>Цена</th>
+                    <th>Описание</th>
+                    <th>Причины</th>
+                </tr>
+            </thead>
+        <tbody>
+        <tr>
+    {% for i in data %}
+            <td>{{ i }}</td>
+    {% endfor %}
+        </tr>
+    </table>
+</div>
+
+
+{% endblock %}
