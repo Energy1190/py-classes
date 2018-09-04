@@ -2,8 +2,8 @@ import os
 import pickle
 from traceback import format_exc
 from collections import defaultdict
-from classes.sqliteDatabase import Database as Db
-from classes.flaskCache import ArrayFlaskCache as Cache
+from my_package.classes.sqlite_database import Database as Db
+from my_package.classes.flask_cache import ArrayFlaskCache as Cache
 
 def init_config(db, cache):
     info = {}

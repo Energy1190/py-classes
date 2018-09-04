@@ -6,10 +6,10 @@ import pickle
 import threading
 import datetime
 
-from classes.sqliteDatabase import Database as Db
-from classes.flaskCache import ArrayFlaskCache as Cache
+from my_package.classes.sqlite_database import Database as Db
+from my_package.classes.flask_cache import ArrayFlaskCache as Cache
 
-from support_functions import *
+from .support_functions import *
 
 from flask import Flask, render_template, url_for, Response, request, jsonify
 
