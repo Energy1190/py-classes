@@ -18,6 +18,10 @@ $RECYCLE.BIN/
 # Windows shortcuts
 *.lnk
 
+dist/
+build/
+my_package.egg-info/
+
 # =========================
 # Operating System Files
 # =========================

@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block title %}Список покупок{% endblock %}
+{% block script%}
+<script type="text/javascript">
+    function GenerateMsg(result, divElem, good_message, bad_message) {
+        var node = document.createElement("div");
+         if (result['status']) {
+            node.className = "alert alert-success";
+            var textnode = document.createTextNode(good_message);
+        } else {
+            node.className = "alert alert-danger";
+            var textnode = document.createTextNode(bad_message);
+        }
+        node.appendChild(textnode);
+        document.getElementById(divElem).appendChild(node);
+        setTimeout(function(){
+            var myNode = document.getElementById(divElem);
+            while (myNode.firstChild) {
+                myNode.removeChild(myNode.firstChild);
+            }
+        }, 5000);
+    }
+
+    function sendForm() {
+        var url = "/" + document.getElementById('number').value + "/add";
+        $.ajax({
+            url:url,
+            type:'post',
+            data:$('#addForm').serialize(),
+            success:function(result){
+                GenerateMsg(result, "status-div", "Позиция добавлена.", "Позиция не добавлена.");
+                setTimeout(function() {
+                   window.location.href = window.location;
+                }, 5001);
+            }
+        });
+    }
+
+    function deletePosition(index) {
+        var url = "/" + index + "/remove";
+        $.ajax({
+            url:url,
+            type:'post',
+            data:$('#addForm').serialize(),
+            success:function(result){
+                GenerateMsg(result, "status-div", "Позиция удалена.", "Позиция не удалена.");
+                setTimeout(function() {
+                   window.location.href = window.location;
+                }, 5001);
+            }
+        });
+    }
+
+</script>
+{% endblock %}
+{% block content %}
+
+<div class="jumbotron jumbotron-fluid">
+    <div class="container">
+        <h1 class="display-6">Список покупок.</h1>
+    </div>
+</div>
+
+{% include 'pages_paginator_include.html' %}
+
+<div class="row" id="status-div"></div>
+
+<div class="w3-padding w3-white notranslate">
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>№</th>
+                <th>Дата</th>
+                <th>Название</th>
+                <th>Кол-во</th>
+                <th>Цена</th>
+                <th>Описание</th>
+                <th>Причины</th>
+                <th>Действия</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for i in data %}
+            <tr>
+                {% for key in ['id','date','name','count','price','description','causes'] %}
+                <td> {{ data[i].object[key] }}</td>
+                {% endfor %}
+                <td>
+                    <table>
+                        <tr><a href="/{{ i }}" role="button" class="btn btn-lg btn-block btn-info" id="detail">Подробно</a></tr>
+                        <tr><a href="/{{ i }}/edit" role="button" class="btn btn-lg btn-block btn-info" id="edit">Редактировать</a></tr>
+                        <tr><button type="button" class="btn btn-lg btn-block btn-danger" id="remove" onclick="deletePosition({{ i }})">Удалить</button></tr>
+                    </table>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+{% include 'pages_paginator_include.html' %}
+
+<form id="addForm" name="confForm">
+    <h4>Добавить запись.</h4>
+    <div class="w3-padding w3-white notranslate">
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>№</th>
+                    <th>Дата</th>
+                    <th>Название</th>
+                    <th>Кол-во</th>
+                    <th>Цена</th>
+                    <th>Описание</th>
+                    <th>Причины</th>
+                    <th>Действия</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td><input type="text" class="form-control" id="number" name="number"></td>
+                    <td><input type="text" class="form-control" id="date" name="date"></td>
+                    <td><input type="text" class="form-control" id="name" name="name"></td>
+                    <td><input type="text" class="form-control" id="count" name="count"></td>
+                    <td><input type="text" class="form-control" id="cost" name="cost"></td>
+                    <td><input type="text" class="form-control" id="desctiption" name="desctiption"></td>
+                    <td><input type="text" class="form-control" id="solution" name="solution"></td>
+                    <td>
+                        <button type="button" class="btn btn-lg btn-block btn-success" id="submit" onclick="sendForm()">Добавить</button>
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</form>
+{% endblock %}

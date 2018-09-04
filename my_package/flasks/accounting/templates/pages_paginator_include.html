@@ -1,0 +1,9 @@
+<nav aria-label="Page navigation example">
+  <ul class="pagination">
+    {% if current_page | int != pages[0] %}<li class="page-item"><a class="page-link" href="?page={{ current_page | int - 1 }}">Назад</a></li>{% endif %}
+    {% for num in pages %}
+    <li class="page-item"><a class="page-link" href="?page={{ num }}">{{ num }}</a></li>
+    {% endfor %}
+    {% if current_page | int != pages[-1] %}<li class="page-item"><a class="page-link" href="?page={{ current_page | int + 1 }}">Вперед</a></li>{% endif %}
+  </ul>
+</nav>

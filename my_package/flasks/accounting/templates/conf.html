@@ -1,0 +1,140 @@
+{% extends "base.html" %}
+{% block title %}Настройки{% endblock %}
+{% block script%}
+{% endblock %}
+{% block content %}
+<div class="jumbotron jumbotron-fluid">
+    <div class="container">
+        <h1 class="display-6">Настройка.</h1>
+    </div>
+</div>
+
+<div class="card bg-primary text-white mt-5">
+    <div class="card-title">Cтатус.</div>
+    <div class="card-body">
+        <div class="row" id="status-div">
+        </div>
+    </div>
+</div>
+
+<div class="card bg-primary text-white mt-5">
+    <div class="card-title">Инициализировать конфигурацию.</div>
+    <div class="card-body">
+        <div id="init_messenger"></div>
+        <button class="btn btn-success" id="initBtn" name=initBtn" onclick="initConf()">Инициализировать</button>
+    </div>
+</div>
+
+<div class="card bg-primary text-white mt-5">
+    <div class="card-title">Отправить конфигурацию.</div>
+    <div class="card-body">
+        <div id="messenger"></div>
+        <form class="form-horizontal reservation_form" id="confForm" name="confForm">
+          <div class="form-group">
+              <label for="FilePath">Расположение базы</label>
+              <input class="form-control" id="FilePath" name="FilePath" form="confForm" placeholder="Enter file path">
+          </div>
+          <div class="form-group">
+              <label for="TableName">Название таблицы</label>
+              <input class="form-control" id="TableName" name="TableName" form="confForm" placeholder="Enter table name">
+          </div>
+
+          <button class="btn btn-success">Отправить</button>
+        </form>
+    </div>
+</div>
+
+<script type="text/javascript">
+    function GenerateMsg(result, divElem, good_message, bad_message) {
+        var node = document.createElement("div");
+         if (result['status']) {
+            node.className = "alert alert-success";
+            var textnode = document.createTextNode(good_message);
+        } else {
+            node.className = "alert alert-danger";
+            var textnode = document.createTextNode(bad_message);
+        }
+        node.appendChild(textnode);
+        document.getElementById(divElem).appendChild(node);
+        setTimeout(function(){
+            var myNode = document.getElementById(divElem);
+            while (myNode.firstChild) {
+                myNode.removeChild(myNode.firstChild);
+            }
+        }, 5000);
+    }
+
+    $('#confForm').submit(function(e){
+        $.ajax({
+            url:'/conf/send',
+            type:'post',
+            data:$('#confForm').serialize(),
+            success: function(result){
+                GenerateMsg(result,"messenger","Конфигурация загружена.","Конфигурация отклонена.")
+            }
+        });
+        e.preventDefault();
+    });
+
+    function initConf() {
+        $.ajax({
+            url:'/conf/init',
+            type:'post',
+            success: function(result){
+                GenerateMsg(result,"init_messenger","Конфигурация инициализирована.","Конфигурация отклонена.")
+            }
+        });
+    }
+
+    function getStatus() {
+        $.ajax({
+            url:'/conf/status',
+            type:'get',
+            success:function(result){
+                var node = document.getElementById('status-div');
+                while (node.firstChild) {
+                    node.removeChild(node.firstChild);
+                }
+
+                var sub_node = document.createElement("div");
+                sub_node.className = "col-sm";
+                sub_node.setAttribute('id', 'config-status');
+                document.getElementById("status-div").appendChild(sub_node);
+
+                var node = document.createElement("div");
+                var header = document.createElement("div");
+                var body = document.createElement("div");
+                body.className = "card-body"
+                header.className = "card-title"
+
+                var textnode = document.createTextNode("Состояние настройки.");
+                header.appendChild(textnode);
+                if (result['db_status']) {
+                    node.className = "card text-white bg-success mb-3"
+                    node.setAttribute('id', 'config-status-card');
+                    var textnode = document.createTextNode("База данных инициализирована.");
+                    body.appendChild(textnode);
+
+                    if (result['cache_status']) {
+                        var pnode = document.createElement("p");
+                        var textnode = document.createTextNode("Объектов: " + result['cache_len']);
+                        pnode.appendChild(textnode);
+                        body.appendChild(pnode);
+                    }
+                } else {
+                    node.className = "card text-white bg-danger mb-3"
+                    var textnode = document.createTextNode("База данных не инициализирована.");
+                    body.appendChild(textnode);
+                }
+
+                document.getElementById('config-status').appendChild(node);
+                node.appendChild(header);
+                node.appendChild(body);
+            }
+        });
+    }
+
+    getStatus();
+    setInterval(getStatus, 30000);
+</script>
+{% endblock %}
