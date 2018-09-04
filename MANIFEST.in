@@ -1,5 +1,5 @@
-include my_package/flasks/output_accounting/static/*
-include my_package/flasks/output_accounting/templates/*
+include my_package/flasks/accounting/static/*
+include my_package/flasks/accounting/templates/*
 
-include my_package/flasks/output_accounting/static/*
-include my_package/flasks/sftp_service/templates/*
+include my_package/flasks/sftp/static/*
+include my_package/flasks/sftp/templates/*

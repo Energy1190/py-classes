@@ -22,14 +22,20 @@ def check_init(force=False):
     global DATABASE, CACHE
 
     status = False
-    if not CACHE or force:
-        status, *over = init_config(DATABASE, CACHE)
-        if len(over): DATABASE, CACHE = over
+    try:
+        if not CACHE or force:
+            status, *over = init_config(DATABASE, CACHE)
+            if len(over): DATABASE, CACHE = over
+    except:
+        pass
+
     return status
 
 @app.route('/', methods=['GET'])
 def main_page():
-    check_init()
+    status = check_init()
+    if not status: return conf_page()
+    
     data_list = CACHE.objects
 
     pages = paginator(data_list)
