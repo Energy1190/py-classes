@@ -7,6 +7,7 @@ import sys
 import time
 import subprocess
 from threading import Thread
+from .button_clicker import ButtonAutoAnswer
 
 try:
     from selenium import webdriver
@@ -367,6 +368,33 @@ class SeleniumBase():
         # Метод запуска.
         self.modes[self.mode]()
 
+class SeleniumExtended(SeleniumBase):
+    def __init__(self, *args, auth_window_title=None, auth_button_title=None, **kwargs):
+        self.auth_window_title = auth_window_title
+        self.auth_button_title = auth_button_title
+
+        super(SeleniumExtended, self).__init__(*args,**kwargs)
+
+    def auth_click(self):
+        while True:
+            try:
+                security_event = ButtonAutoAnswer(self.auth_window_title, self.auth_button_title)
+
+                security_event.find()
+                security_event.click()
+
+                self.in_browser_connect()
+                break
+            except:
+                pass
+
+    def connect(self):
+        self.in_browser_login()
+
+        try:
+            self.in_browser_connect()
+        except:
+            self.auth_click()
 
 #if __name__ == '__main__':
 #    options = {'ignoreProtectedModeSettings': True,
