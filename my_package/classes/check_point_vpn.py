@@ -362,6 +362,11 @@ class SeleniumBase():
             self.re_connect()
             if self.exit_flag: break
 
+        try: self.disconnect()
+        except: pass
+
+        self.stop()
+
     def daemon_start(self):
         # Инициализация режима демона, демон запускается в отдельном потоке
         print('-----------------------------------')
