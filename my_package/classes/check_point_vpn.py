@@ -191,8 +191,21 @@ class SeleniumBase():
         self.drivers['x86'] = os.path.join(pathDriverDir, 'IEDriverServer32x.exe')
         self.drivers['x64'] = os.path.join(pathDriverDir, 'IEDriverServer64x.exe')
 
-        if not os.path.exists(self.drivers['x86']): self.status['x86'] = False
-        if not os.path.exists(self.drivers['x64']): self.status['x64'] = False
+        if not os.path.exists(self.drivers['x86']):
+            pathDir = os.getcwd()
+            pathDriverDir = os.path.join(pathDir, 'drivers')
+            self.drivers['x86'] = os.path.join(pathDriverDir, 'IEDriverServer32x.exe')
+
+            if not os.path.exists(self.drivers['x86']):
+                self.status['x86'] = False
+
+        if not os.path.exists(self.drivers['x64']):
+            pathDir = os.getcwd()
+            pathDriverDir = os.path.join(pathDir, 'drivers')
+            self.drivers['x86'] = os.path.join(pathDriverDir, 'IEDriverServer64x.exe')
+
+            if not os.path.exists(self.drivers['x64']):
+                self.status['x64'] = False
 
     def _self_checks(self):
         # Список выполняемых проверок, результат передается в словарь self.status
