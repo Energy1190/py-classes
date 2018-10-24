@@ -1,8 +1,9 @@
 import sys
 import time
 import argparse
+from traceback import format_exc
 from my_package.classes.check_point_vpn import SeleniumBase, SeleniumExtended
-
+from my_package.scripts.send_slack_notification import main as notification
 def stop(obj):
     try: obj.stop()
     except: pass
@@ -29,6 +30,7 @@ def main_cycle(args):
         except:
             time.sleep(5)
             if obj: stop(obj)
+            if args.slack_url: notification(args.slack_url, 'Error in CheckPointVPN.', traceback=format_exc())
             obj = create_obj(obj, args, options)
 
 def main():
@@ -37,6 +39,7 @@ def main():
     parser.add_argument('site', help='Website address. For example: http://example.com')
     parser.add_argument('--auth_window_title', help='The title of the window with the offer of a certificate')
     parser.add_argument('--auth_button_title', help='The inscription on the buttons with confirmation, usually - OK')
+    parser.add_argument('--slack_url')
 
     args = parser.parse_args()
     if not args.site:
