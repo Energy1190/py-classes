@@ -7,7 +7,9 @@ import sys
 import time
 import subprocess
 from threading import Thread
+from traceback import format_exc
 from .button_clicker import ButtonAutoAnswer
+from my_package.scripts.send_slack_notification import main as notifications
 
 try:
     from selenium import webdriver
@@ -132,7 +134,7 @@ class SeleniumBase():
     browser_map = {'IE':{'exe_name': 'iexplore.exe',
                          'options': DesiredCapabilities().INTERNETEXPLORER,
                          'type': webdriver.Ie}}
-    def __init__(self, url, browser='IE', options=None, until=15, min_time=600, mode='daemon', debug=False):
+    def __init__(self, url, browser='IE', options=None, until=15, min_time=600, mode='daemon', debug=False, notifications=None):
         self.url = url
         self.browser = browser
         self.options = options
@@ -153,6 +155,7 @@ class SeleniumBase():
         self.popup_windows = []
 
         self.exit_flag = False
+        self.notifications = notifications
 
     def _check_reg(self):
         # Метод для проверки существования браузера в системе
@@ -353,20 +356,24 @@ class SeleniumBase():
 
     def daemon_mode(self):
         # Метод программы для режима демона
-        self.init()
-        self.start()
-        while True:
-            self.connect()
-            self.wait()
-            self.disconnect()
-            self.re_connect()
-            if self.exit_flag: break
+        try:
+            self.init()
+            self.start()
+            while True:
+                self.connect()
+                self.wait()
+                self.disconnect()
+                self.re_connect()
+                if self.exit_flag: break
 
-        try: self.disconnect()
-        except: pass
+            try: self.disconnect()
+            except: pass
 
-        self.stop()
-
+            self.stop()
+        except:
+            if self.notifications:
+                notifications(self.notifications, 'Error in CheckPointVPN.', traceback=format_exc())
+                
     def daemon_start(self):
         # Инициализация режима демона, демон запускается в отдельном потоке
         print('-----------------------------------')
@@ -393,9 +400,10 @@ class SeleniumExtended(SeleniumBase):
 
         super(SeleniumExtended, self).__init__(*args,**kwargs)
 
-    def auth_click(self):
+    def auth_click(self, recursion=0):
         while True:
             try:
+                time.sleep(self.until)
                 security_event = ButtonAutoAnswer(self.auth_window_title, self.auth_button_title)
 
                 security_event.find()
@@ -404,6 +412,8 @@ class SeleniumExtended(SeleniumBase):
                 self.in_browser_connect()
                 break
             except:
+                recursion += 1
+                if recursion > 10: break
                 pass
 
     def connect(self):

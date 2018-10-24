@@ -9,12 +9,20 @@ def stop(obj):
     except: pass
 
 def create_obj(obj,args,options):
-    if not args.auth_window_title or not args.auth_button_title:
-        obj = SeleniumBase(args.site, options=options)
-    else:
-        obj = SeleniumExtended(args.site, options=options,
-                               auth_window_title=args.auth_window_title,
-                               auth_button_title=args.auth_button_title)
+    kwargs = {}
+    kwargs['options'] = options
+    class_type = SeleniumBase
+    if args.auth_window_title:
+        kwargs['auth_window_title'] = args.auth_window_title
+        class_type = SeleniumExtended
+    if args.auth_button_title:
+        kwargs['auth_button_title'] = args.auth_button_title
+        class_type = SeleniumExtended
+    if args.slack_url:
+        kwargs['notifications'] = args.slack_url
+        class_type = SeleniumExtended
+    
+    obj = class_type(args.site, **kwargs)
     return obj
 
 def main_cycle(args):
