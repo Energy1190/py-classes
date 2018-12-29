@@ -5,7 +5,7 @@ import my_package
 def main():
     path = my_package.__file__.split(os.sep)[:-1]
 
-    path_to_folder = path + ['src_exe']
+    path_to_folder = os.sep.join(path + ['src_exe'])
     path_to_dist = os.path.join(os.getcwd(), 'dist')
     path_to_build = os.path.join(os.getcwd(), 'build')
 
@@ -18,7 +18,7 @@ def main():
             file = os.path.join(path_to_folder, item)
             print('BUILD: {}'.format(item))
 
-            os.system(template.format(path_to_dist,path_to_build,path))
+            os.system(template.format(path_to_dist,path_to_build,file))
             shutil.rmtree(path_to_build)
             print('DONE: {}'.format(item))
 
