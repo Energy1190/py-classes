@@ -1,5 +1,5 @@
 # Получиение конфигурации для импорта/экспорта базы данных Oracle
-# Версия: 0.3
+# Версия: 0.4
 
 '''
     ; AUTH
@@ -25,10 +25,26 @@
 '''
 
 import os
+import yaml
 import configparser
 
 def read_config(filename):
     # Получение конфигурации из файла
+    result = {}
+    error_flag = False
+
+    mime = filename.split('.')[-1]
+    if mime == 'yaml':
+        result, error_flag = read_yaml(filename)
+    elif mime == 'ini':
+        result, error_flag = read_ini(filename)
+    else:
+        error_flag = True
+
+    return result, error_flag
+
+def read_ini(filename):
+    # Получение конфигурации из файла ini
     result = {}
     config = configparser.ConfigParser()
     error_flag = False
@@ -47,11 +63,22 @@ def read_config(filename):
         error_flag = True
     return result, error_flag
 
+def read_yaml(filename):
+    # Получение конфигурации из файла yaml
+    result = {}
+    error_flag = False
+    with open(filename, 'r') as file:
+        try: result = yaml.load(file)
+        except: error_flag = True
+
+    return result, error_flag
+
+
 def get(env,array):
     # Получение элемента из конфиграции
     empty = False
     for num in range(len(array)):
-        if env: env = env.get(array[num])
+        if env: env = (env.get(array[num]) or env.get(array[num].lower()))
 
     if env is None:
         empty = True
@@ -98,3 +125,8 @@ ENV_PASSWA = ['AUTH','password']
 ENV_DIRNAM = ['TEMP','name']
 ENV_DIRPAT = ['TEMP','directory']
 ENV_TABLES = ['TEMP','tablespace']
+ENV_SPECUS = ['OPT', 'speccheck']
+ENV_SPECFL = ['OPT', 'specfile']
+ENV_DEBUGM = ['OPT', 'debug']
+ENV_SCHEMA = ['OPT', 'schemas']
+ENV_OPTSNM = ['OPT', 'opts']

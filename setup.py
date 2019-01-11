@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name='my_package',
-      version='0.17.3',
+      version='0.17.4',
       description='A set of my classes, functions, projects and web interfaces.',
       url='https://github.com/Energy1190/py-projects',
       author='Energy1190',
@@ -14,7 +14,8 @@ setup(name='my_package',
           'flask',
           'paramiko',
           'requests',
-		  'cx_Oracle'
+		  'cx_Oracle',
+		  'yaml'
       ],
       include_package_data=True,
       zip_safe=False)

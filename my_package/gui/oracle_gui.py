@@ -121,7 +121,7 @@ class OracleGUI:
         else:
             [item.configure(state='disabled') for item in self.objs[VAR_SPECFL]]
 
-    def _callback_set_config(self, var, filetypes=[("*.ini files", "*.ini"),]):
+    def _callback_set_config(self, var, filetypes=[("*.ini files", "*.ini"),("*.yaml files", "*.yaml")]):
         value = askopenfilename(initialdir=os.sep.join(os.path.abspath( __file__ ).split(os.sep)[:-1]),
                                 filetypes=filetypes)
         if value: var.set(value)
@@ -242,6 +242,11 @@ class OracleGUI:
         self.set_var(VAR_DIRNAM, ENV_DIRNAM)
         self.set_var(VAR_DIRPAT, ENV_DIRPAT)
         self.set_var(VAR_PARALL, ENV_PARALL)
+        self.set_var(VAR_SPECUS, ENV_SPECUS)
+        self.set_var(VAR_SPECFL, ENV_SPECFL)
+        self.set_var(VAR_DEBUGM, ENV_DEBUGM)
+        self.set_var(VAR_SCHEMA, ENV_SCHEMA)
+        self.set_var(VAR_OPTSNM, ENV_OPTSNM)
 
     def  _callback_start_work(self):
         for item in self.vars:
