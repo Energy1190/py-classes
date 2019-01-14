@@ -178,7 +178,7 @@ def create_directory(conn_string,name,path, grants=['READ','WRITE'], users=[], p
 def create_tablespace(conn_string,name,datafiles=[], pdb=False):
     '''
         Создает табличное пространство, если его не существует.
-        Добавляет в тебличноепространство файлы.
+        Добавляет в табличноепространство файлы.
         Принимет:
             conn_string -    строка соединения
             name        -    имя табличного пространства

@@ -1,8 +1,9 @@
 # Основная логика работы программы импорта\экспорта
-# Версия: 0.1
+# Версия: 0.2
 
 import os
 from my_package.classes.oracle_api import *
+from my_package.classes.oracle_specfile import *
 from my_package.classes.datapump_api import *
 from my_package.functions.oracle_vars import *
 from traceback import format_exc
@@ -112,8 +113,32 @@ def main(run=False,**kwargs):
         datapump_kwargs['schemas'] = kwargs.get(VAR_SCHEMA).split(',')
 
     if kwargs.get(VAR_OPTSNM):
-        datapump_kwargs['schemas'] = kwargs.get(VAR_OPTSNM)
+        datapump_kwargs['opts'] = kwargs.get(VAR_OPTSNM)
 
+    if kwargs.get(VAR_SPECUS):
+        specpath = kwargs.get(VAR_SPECFL)
+        specfile_kwargs = {}
+        specfile_kwargs['pdb'] = pdb
+        specfile_kwargs['mode'] = mode
+        specfile_kwargs['conn_string'] = conn_string
+        if datapump_kwargs.get('schemas'):
+            specfile_kwargs['schemas'] = datapump_kwargs['schemas']
+
+        if not specpath:
+            result['error'] = 1
+            result['desctiption'] = 'The path to the specfile is not declared.'
+            return result
+
+        try:
+            if action == 'import':
+                SpecFile(path=specpath,action='execute').init(**specfile_kwargs)
+
+            elif action == 'export':
+                SpecFile(path=specpath,action='create').init(**specfile_kwargs)
+        except:
+            result['error'] = 1
+            result['desctiption'] = 'Error when working with specification. \n\n {}'.format(format_exc())
+            return result
     try:
         obj = DatapumpApi(oracle_home,action=action,
                           username=manager,
