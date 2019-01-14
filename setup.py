@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name='my_package',
-      version='0.17.5',
+      version='0.17.6',
       description='A set of my classes, functions, projects and web interfaces.',
       url='https://github.com/Energy1190/py-projects',
       author='Energy1190',
@@ -15,7 +15,7 @@ setup(name='my_package',
           'paramiko',
           'requests',
 		  'cx_Oracle',
-		  'yaml'
+		  'pyyaml'
       ],
       include_package_data=True,
       zip_safe=False)
