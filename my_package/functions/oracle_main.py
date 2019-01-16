@@ -49,6 +49,7 @@ def main(run=False,**kwargs):
             return result
 
         os.environ["ORACLE_HOME"] = oracle_home
+        os.environ["TNS_ADMIN"] = oracle_home + '{}network{}admin'.format(os.sep,os.sep)
         conn_string = '{}/{}@{}'.format(username, password, instance)
 
     manager = kwargs.get(VAR_LOGINT)
