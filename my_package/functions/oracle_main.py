@@ -87,7 +87,7 @@ def main(run=False,**kwargs):
             create_user(conn_string,manager,manager_password,pdb=pdb,force=True, **kwargs)
         except:
             result['error'] = 1
-            result['description'] = 'Could not create or change user'
+            result['description'] = 'Could not create or change user. \n\n {}'.format(format_exc())
             return result
 
     directory = kwargs.get(VAR_DIRPAT)
@@ -95,14 +95,14 @@ def main(run=False,**kwargs):
     for item in [directory, directory_name]:
         if not item:
             result['error'] = 1
-            result['description'] = 'The name or path to the directory is not declared.'
+            result['description'] = 'The name or path to the directory is not declared. \n\n {}'.format(format_exc())
             return result
 
     try:
         create_directory(conn_string, directory_name, directory, users=[manager], pdb=pdb, force=True)
     except:
         result['error'] = 1
-        result['description'] = 'Could not create directory "{}", path: "{}"'.format(directory_name,directory)
+        result['description'] = 'Could not create directory "{}", path: "{}" \n\n {}'.format(directory_name,directory,format_exc())
         return result
 
     target = instance
