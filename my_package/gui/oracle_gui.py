@@ -91,6 +91,7 @@ class OracleGUI:
     def checks(self, *args):
         if not self.vars[VAR_PDBCHK].get():
             [item.configure(state='disabled') for item in self.objs[VAR_PDBNAM]]
+            self.vars[VAR_PDBNAM].set('')
         elif self.vars[VAR_PDBCHK].get():
             [item.configure(state='normal') for item in self.objs[VAR_PDBNAM]]
 
