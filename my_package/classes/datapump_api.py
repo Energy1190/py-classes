@@ -81,4 +81,6 @@ class DatapumpApi():
             raise RunDataPumpError("Не удалось выполнить команду: \n\n {}".format(self.exec_cmd))
 
     def debug(self):
-        print("Сформирована команда: \n\n {}".format(self.exec_cmd))
+        output = "Сформирована команда: \n\n {}".format(self.exec_cmd)
+        print(output)
+        return output
