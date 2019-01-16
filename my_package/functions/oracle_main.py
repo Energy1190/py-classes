@@ -15,7 +15,10 @@ def main(run=False,**kwargs):
     password = kwargs.get(VAR_PASSWA)
     instance = kwargs.get(VAR_INSTAN)
     oracle_home = kwargs.get(VAR_HOMENM)
-    pdb = kwargs.get(VAR_PDBNAM)
+    if bool(VAR_PDBCHK):
+        pdb = kwargs.get(VAR_PDBNAM)
+    else:
+        pdb = False
 
     for item in [username,password,instance]:
         if not item:
