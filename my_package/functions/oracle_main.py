@@ -66,7 +66,7 @@ def main(run=False,**kwargs):
                 create_tablespace(conn_string,tables,datafiles=['{}.DBF'.format(tables)],pdb=pdb)
             except:
                 result['error'] = 1
-                result['description'] = 'Error creating tablespace {}.'.format(tables)
+                result['description'] = 'Error creating tablespace {}. \n\n {}'.format(tables, format_exc())
                 return result
 
 
