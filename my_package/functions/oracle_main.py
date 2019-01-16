@@ -84,7 +84,7 @@ def main(run=False,**kwargs):
             create_user_kwargs['tablespace'] = tables
 
         try:
-            create_user(conn_string,manager,manager_password,pdb=pdb,force=True, **kwargs)
+            create_user(conn_string,manager,manager_password,pdb=pdb,force=True)
         except:
             result['error'] = 1
             result['description'] = 'Could not create or change user. \n\n {}'.format(format_exc())

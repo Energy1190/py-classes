@@ -233,6 +233,7 @@ class OracleGUI:
         self.set_var(VAR_PORTNM, ENV_PORTNM)
         self.set_var(VAR_INSTAN, ENV_INSTAN)
         self.set_var(VAR_PDBNAM, ENV_PDBNAM)
+        self.set_var(VAR_PDBCHK, ENV_PDBCHK)
         self.set_var(VAR_LOGINA, ENV_LOGINA)
         self.set_var(VAR_LOGINT, ENV_LOGINT)
         self.set_var(VAR_PASSWA, ENV_PASSWA)
@@ -248,7 +249,7 @@ class OracleGUI:
         self.set_var(VAR_SCHEMA, ENV_SCHEMA)
         self.set_var(VAR_OPTSNM, ENV_OPTSNM)
         self.set_var(VAR_ACTION, ENV_ACTION)
-        self.set_var(VAR_ACTION, ENV_MODENM)
+        self.set_var(VAR_MODENM, ENV_MODENM)
 
     def  _callback_start_work(self):
         for item in self.vars:
