@@ -80,7 +80,7 @@ class SpecFile():
 
         if action == 'execute':
             for tablespace in self.raw:
-                create_tablespace(conn_string, tablespace, datafiles=[ '.DBF'.format(file) for file in self.raw[tablespace]], pdb=pdb)
+                create_tablespace(conn_string, tablespace, datafiles=[ '{}.DBF'.format(file) for file in self.raw[tablespace]], pdb=pdb)
 
             return True
 
