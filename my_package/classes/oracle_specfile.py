@@ -95,6 +95,7 @@ class SpecFile():
             if mode == 'FULL':
                 raw = obj._run_query(query)
                 self._add_data(raw,result)
+				return result
 
             elif mode == 'SCHEMA':
                 schemas = kwargs.get('schemas')
