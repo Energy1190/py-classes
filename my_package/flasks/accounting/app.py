@@ -28,6 +28,9 @@ def check_init(force=False):
             if len(over): DATABASE, CACHE = over
     except:
         pass
+    
+    if DATABASE and CACHE:
+        status = True
 
     return status
 
