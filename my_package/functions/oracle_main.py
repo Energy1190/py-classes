@@ -8,6 +8,55 @@ from my_package.classes.datapump_api import *
 from my_package.functions.oracle_vars import *
 from traceback import format_exc
 
+def read(**kwargs):
+    result = {'status': 0, 'description': '', 'error': 0, 'object': None}
+
+    manager = kwargs.get(VAR_LOGINT)
+    manager_password = kwargs.get(VAR_PASSWT)
+    directory_name = kwargs.get(VAR_DIRNAM)
+    instance = kwargs.get(VAR_INSTAN)
+    oracle_home = kwargs.get(VAR_HOMENM)
+    action = kwargs.get(VAR_ACTION)
+    mode = kwargs.get(VAR_MODENM)
+    target = instance
+
+    if bool(VAR_PDBCHK):
+        pdb = kwargs.get(VAR_PDBNAM)
+    else:
+        pdb = False
+    if pdb: target = pdb
+
+    sysdba = kwargs.get(VAR_SYSDBA)
+    datapump_kwargs = {}
+    if kwargs.get(VAR_PARALL):
+        datapump_kwargs['parallel'] = kwargs.get(VAR_PARALL)
+
+    if kwargs.get(VAR_SCHEMA):
+        datapump_kwargs['schemas'] = kwargs.get(VAR_SCHEMA).split(',')
+
+    if kwargs.get(VAR_OPTSNM):
+        datapump_kwargs['opts'] = kwargs.get(VAR_OPTSNM)
+
+    for item in [oracle_home,action,manager,manager_password,target,sysdba,mode,directory_name,instance]:
+        if not item:
+            result['error'] = 1
+            result['description'] = 'No variables declared for authentication.'
+            return result
+
+    try:
+        obj = DatapumpApi(oracle_home,action=action,
+                          username=manager,
+                          password=manager_password,
+                          instance=target,
+                          sysdba=sysdba,
+                          mode=mode,
+                          directory=directory_name, **datapump_kwargs)
+    except:
+        result['error'] = 1
+        result['description'] = 'Error creating executable command. \n\n {}'.format(format_exc())
+        return result
+
+    return result
 def main(run=False,**kwargs):
     result = {'status': 0, 'description': '', 'error': 0, 'object': None}
 

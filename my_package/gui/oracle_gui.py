@@ -4,6 +4,7 @@ import tkinter.ttk as ttk
 from my_package.functions.oracle_vars import *
 from my_package.functions.oracle_vars import get as get_env
 from my_package.functions.oracle_main import main as init
+from my_package.functions.oracle_main import read as read_cmd
 from tkinter.messagebox import showerror, askokcancel
 from tkinter.filedialog import askopenfilename, askdirectory
 
@@ -210,6 +211,7 @@ class OracleGUI:
 
         tk.Button(frame, text='Загрузить конфигурацию', command=self._callback_load_config).pack(anchor=tk.CENTER,fill=tk.X)
         tk.Button(frame, text='Запустить программу', command=self._callback_start_work).pack(anchor=tk.CENTER,fill=tk.X)
+        tk.Button(frame, text='Отобразить команду', command=self._callback_get_cmd).pack(anchor=tk.CENTER,fill=tk.X)
 
     def _callback_load_config(self):
         filepath = self.vars[VAR_CONFIG].get()
@@ -276,6 +278,16 @@ class OracleGUI:
                 return
 
         body['object'].run()
+    
+    def _callback_get_cmd(self):
+        body = read_cmd(**self.parameters)
+        if not body:
+            showerror('Ошибка',message='Не опознанная ошибка при формировании запроса.')
+            return
+
+        check = askokcancel('DEBUG. Окончательный запрос к программе', message=body['object'].debug())
+        if not check:
+            return
 
 if __name__ == '__main__':
     root = tk.Tk()
