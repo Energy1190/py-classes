@@ -8,7 +8,7 @@ from my_package.classes.datapump_api import *
 from my_package.functions.oracle_vars import *
 from traceback import format_exc
 
-def read(**kwargs):
+def read(run=False,**kwargs):
     result = {'status': 0, 'description': '', 'error': 0, 'object': None}
 
     manager = kwargs.get(VAR_LOGINT)
@@ -37,7 +37,7 @@ def read(**kwargs):
     if kwargs.get(VAR_OPTSNM):
         datapump_kwargs['opts'] = kwargs.get(VAR_OPTSNM)
 
-    for item in [oracle_home,action,manager,manager_password,target,sysdba,mode,directory_name,instance]:
+    for item in [oracle_home,action,manager,manager_password,target,mode,directory_name,instance]:
         if not item:
             result['error'] = 1
             result['description'] = 'No variables declared for authentication.'
@@ -55,6 +55,18 @@ def read(**kwargs):
         result['error'] = 1
         result['description'] = 'Error creating executable command. \n\n {}'.format(format_exc())
         return result
+
+    result['description'] = 'Success.'
+    result['status'] = 1
+    if run:
+        try:
+            obj.run()
+            result['description'] = 'Done.'
+            result['status'] = 2
+        except:
+            result['error'] = 1
+            result['description'] = 'Error at command execution.'
+            return result
 
     result['object'] = obj
     return result
@@ -219,6 +231,5 @@ def main(run=False,**kwargs):
             result['description'] = 'Error at command execution.'
             return result
 
-    print('END!')
     result['object'] = obj
     return result

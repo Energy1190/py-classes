@@ -211,7 +211,7 @@ class OracleGUI:
 
         tk.Button(frame, text='Загрузить конфигурацию', command=self._callback_load_config).pack(anchor=tk.CENTER,fill=tk.X)
         tk.Button(frame, text='Запустить программу', command=self._callback_start_work).pack(anchor=tk.CENTER,fill=tk.X)
-        tk.Button(frame, text='Отобразить команду', command=self._callback_get_cmd).pack(anchor=tk.CENTER,fill=tk.X)
+        tk.Button(frame, text='Только Datapump', command=self._callback_get_cmd).pack(anchor=tk.CENTER,fill=tk.X)
 
     def _callback_load_config(self):
         filepath = self.vars[VAR_CONFIG].get()
@@ -295,6 +295,8 @@ class OracleGUI:
         check = askokcancel('DEBUG. Окончательный запрос к программе', message=body['object'].debug())
         if not check:
             return
+
+        body['object'].run()
 
 if __name__ == '__main__':
     root = tk.Tk()
