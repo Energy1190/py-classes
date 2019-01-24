@@ -284,6 +284,10 @@ class OracleGUI:
         if not body:
             showerror('Ошибка',message='Не опознанная ошибка при формировании запроса.')
             return
+			
+        if body.get('error'):
+            showerror('Ошибка',message='Ошибка при формировании запроса: \n\n {}'.format(body.get('description')))
+            return
 
         check = askokcancel('DEBUG. Окончательный запрос к программе', message=body['object'].debug())
         if not check:
