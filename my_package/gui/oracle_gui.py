@@ -280,6 +280,9 @@ class OracleGUI:
         body['object'].run()
     
     def _callback_get_cmd(self):
+        for item in self.vars:
+            self.parameters[item] = self.vars[item].get()
+
         body = read_cmd(**self.parameters)
         if not body:
             showerror('Ошибка',message='Не опознанная ошибка при формировании запроса.')
