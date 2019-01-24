@@ -56,7 +56,9 @@ def read(**kwargs):
         result['description'] = 'Error creating executable command. \n\n {}'.format(format_exc())
         return result
 
+    result['object'] = obj
     return result
+
 def main(run=False,**kwargs):
     result = {'status': 0, 'description': '', 'error': 0, 'object': None}
 
