@@ -9,11 +9,12 @@ import datetime
 from my_package.classes.sqlite_database import Database as Db
 from my_package.classes.flask_cache import ArrayFlaskCache as Cache
 
-from .support_functions import *
+from support_functions import *
 
 from flask import Flask, render_template, url_for, Response, request, jsonify
 
 app = Flask(__name__)
+app.local_vars = {}
 
 CACHE = None
 DATABASE = None
@@ -24,7 +25,8 @@ def check_init(force=False):
     status = False
     try:
         if not CACHE or force:
-            status, *over = init_config(DATABASE, CACHE)
+            db_file = app.local_vars.get('DB_FILE')
+            status, *over = init_config(DATABASE, CACHE, db_file=db_file)
             if len(over): DATABASE, CACHE = over
     except:
         pass
@@ -63,7 +65,8 @@ def conf_page():
 
 @app.route('/conf/send', methods=['POST'])
 def conf_send_page():
-    status = accept_config(request.form)
+    db_file = app.local_vars.get('DB_FILE')
+    status = accept_config(request.form, db_file=db_file)
     return jsonify({'status': status})
 
 @app.route('/conf/init', methods=['POST'])

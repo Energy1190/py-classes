@@ -5,9 +5,9 @@ from collections import defaultdict
 from my_package.classes.sqlite_database import Database as Db
 from my_package.classes.flask_cache import ArrayFlaskCache as Cache
 
-def init_config(db, cache):
+def init_config(db, cache, **kwargs):
     info = {}
-    datafilepath = os.environ.get('DB_FILE') or '.db'
+    datafilepath = kwargs.get('db_file') or '.db'
     with open(datafilepath, 'rb') as file:
         info = pickle.load(file)
 
@@ -29,7 +29,7 @@ def init_config(db, cache):
 
     return True, db, cache
 
-def accept_config(form):
+def accept_config(form, **kwargs):
     filepath = ''
     tablename = ''
 
@@ -49,8 +49,8 @@ def accept_config(form):
 
     data = {'filename': filename, 'filepath': filepath, 'table': tablename}
 
-    datafilepath = os.environ.get('DB_FILE') or '.db'
-    with open('.db', 'wb') as file:
+    datafilepath = kwargs.get('db_file') or '.db'
+    with open(datafilepath, 'wb') as file:
         pickle.dump(data, file)
 
     return True

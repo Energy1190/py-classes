@@ -12,10 +12,10 @@ from os.path import basename
 from flask import Flask, render_template, url_for, Response, request, jsonify, send_from_directory
 from .store import SftpConfig, OutputData
 
-data_path = (os.environ.get('DB_PATH') or 'data')
 app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = data_path
-sftp_config = SftpConfig((os.environ.get('DB_FILE') or '.sftp'))
+app.local_vars = {}
+app.config['UPLOAD_FOLDER'] = app.local_vars.get('DB_PATH') or 'data'
+sftp_config = SftpConfig((app.local_vars.get('DB_FILE') or '.sftp'), app.local_vars.get('DB_PATH') or './data')
 thread_files = []
 
 def thread_remove_zip(filepath, thread_files, *args):

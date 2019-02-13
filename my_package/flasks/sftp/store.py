@@ -6,8 +6,6 @@ import pickle
 import paramiko
 from traceback import format_exc
 
-data_path = (os.environ.get('DB_PATH') or 'data')
-
 class Empty():
     def close(self):
         return True
@@ -407,8 +405,9 @@ class SftpSync(SftpConnection, LocalStore):
         return sync_result, self.error
 
 class SftpConfig():
-    def __init__(self, path):
+    def __init__(self, path, data_path):
         self.path = path
+        self.data_path = data_path
         self.sftp = None
 
         self.host = None
@@ -444,7 +443,7 @@ class SftpConfig():
         if confing:
             self.set(confing)
             self.init_time = self.get_time()
-            self.sftp = SftpSync(confing['host'],confing['port'],confing['login'],confing['password'],path=data_path)
+            self.sftp = SftpSync(confing['host'],confing['port'],confing['login'],confing['password'],path=self.data_path)
             self.isinit = True
         else:
             self.isinit = False
@@ -454,7 +453,7 @@ class SftpConfig():
     def reinit(self):
         if self.sftp: self.sftp.close()
         self.init_time = self.get_time()
-        self.sftp = SftpSync(self.host,self.port,self.login,self.password,path=data_path)
+        self.sftp = SftpSync(self.host,self.port,self.login,self.password,path=self.data_path)
         self.isinit = True
 
         return self.sftp, self.isinit
