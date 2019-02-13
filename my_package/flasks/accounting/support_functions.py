@@ -7,7 +7,8 @@ from my_package.classes.flask_cache import ArrayFlaskCache as Cache
 
 def init_config(db, cache):
     info = {}
-    with open('.db', 'rb') as file:
+    datafilepath = os.environ.get('DB_FILE') or '.db'
+    with open(datafilepath, 'rb') as file:
         info = pickle.load(file)
 
     required = ['filename', 'filepath', 'table']
@@ -47,6 +48,8 @@ def accept_config(form):
         return False
 
     data = {'filename': filename, 'filepath': filepath, 'table': tablename}
+
+    datafilepath = os.environ.get('DB_FILE') or '.db'
     with open('.db', 'wb') as file:
         pickle.dump(data, file)
 
