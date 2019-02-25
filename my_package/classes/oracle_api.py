@@ -76,9 +76,20 @@ class OracleApi():
         # Получение данных о всех табличных пространствах
         return self._run_query('SELECT  FILE_NAME, BLOCKS, TABLESPACE_NAME FROM DBA_DATA_FILES')
 
+    def get_temp_tablespaces(self):
+        # Получение данных о всех временных табличных пространствах
+        return self._run_query('SELECT  FILE_NAME, BLOCKS, TABLESPACE_NAME FROM DBA_TEMP_FILES')
+
     def check_tablespace(self,name):
-        # Проверяет наличае табличного пространства
+        # Проверяет наличие табличного пространства
         raw = self.get_tablespaces()
+        names = [item[2] for item in raw]
+        if name.upper() in names:
+            return True
+
+    def check_temp_tablespace(self,name):
+        # Проверяет наличие временного табличного пространства
+        raw = self.get_temp_tablespaces()
         names = [item[2] for item in raw]
         if name.upper() in names:
             return True
@@ -89,6 +100,12 @@ class OracleApi():
         if not exist:
             return self._run_query("CREATE TABLESPACE {} DATAFILE '{}' SIZE {} REUSE AUTOEXTEND ON".format(name,path,size))
 
+    def create_temp_tablespace(self,name,path,size='100M'):
+        # Создает временное табличное пространство
+        exist = self.check_temp_tablespace(name)
+        if not exist:
+            return self._run_query("CREATE TEMPORARY TABLESPACE {} TEMPFILE '{}' SIZE {} REUSE AUTOEXTEND ON".format(name,path,size))
+
     def add_tablespace_df(self, name, datafile, maxsize=20000):
         # Добавляет в табличное пространство новый файл с данными
         exist = self.check_tablespace(name)
@@ -97,6 +114,15 @@ class OracleApi():
             if not exist_df:
                 path = os.sep.join(self.get_dba_path()[0])
                 return self._run_query("""ALTER TABLESPACE "{}" ADD DATAFILE '{}{}{}' SIZE 300000000 AUTOEXTEND ON MAXSIZE {}M""".format(name,path,os.sep,datafile,str(maxsize)))
+
+    def add_temp_tablespace_df(self, name, datafile, maxsize=20000):
+        # Добавляет в табличное пространство новый файл с данными
+        exist = self.check_tablespace(name)
+        if exist:
+            exist_df = self.check_datafile(name, datafile)
+            if not exist_df:
+                path = os.sep.join(self.get_dba_path()[0])
+                return self._run_query("""ALTER TABLESPACE "{}" ADD TEMPFILE '{}{}{}' SIZE 300000000 AUTOEXTEND ON MAXSIZE {}M""".format(name,path,os.sep,datafile,str(maxsize)))
 
     def drop_tablespace(self,name):
         # Удаляет табличное простанство
@@ -175,7 +201,7 @@ def create_directory(conn_string,name,path, grants=['READ','WRITE'], users=[], p
             for user in users:
                 oracle.grant_dir(user,name,grant)
 
-def create_tablespace(conn_string,name,datafiles=[], pdb=False):
+def create_tablespace(conn_string,name,datafiles=[], pdb=False,temporary=False):
     '''
         Создает табличное пространство, если его не существует.
         Добавляет в табличноепространство файлы.
@@ -184,15 +210,22 @@ def create_tablespace(conn_string,name,datafiles=[], pdb=False):
             name        -    имя табличного пространства
             datafiles   -    список с именами файлов данных
             pdb         -    указание на контейнерную базу данных (название)
+            temporary   -    указывает на временное табличное пространство
     '''
     oracle = OracleApi(conn_string, pdb=pdb)
+    add = oracle.add_tablespace_df
+    create = oracle.create_tablespace
+    if temporary:
+        add = oracle.add_temp_tablespace_df
+        create = oracle.create_temp_tablespace
+
     if len(datafiles):
         first = datafiles.pop(0)
         path = os.sep.join(oracle.get_dba_path()[0])
 
-        oracle.create_tablespace(name,'{}{}{}'.format(path,os.sep,first))
+        create(name,'{}{}{}'.format(path,os.sep,first))
         for file in datafiles:
-            oracle.add_tablespace_df(name,file)
+            add(name,file)
 
 
 
