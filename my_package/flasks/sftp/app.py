@@ -1,227 +1,209 @@
+# Веб-приложение, для работы SFTP
+# Версия: 2.0
 import os
-import re
-import csv
-import time
-import json
 import pickle
-import threading
-import zipfile
-import datetime
+from flask_restful import Api, Resource, reqparse
+from flask import Flask, request, jsonify, send_from_directory, render_template
+from .store import WorkingCopy, Sync
+from traceback import format_exc
 
-from os.path import basename
-from flask import Flask, render_template, url_for, Response, request, jsonify, send_from_directory
-from .store import SftpConfig, OutputData
+# Получение переменных
+data_path = (os.environ.get('DB_PATH') or 'data')
+config_path = (os.environ.get('DB_FILE') or '.sftp')
 
 app = Flask(__name__)
-app.local_vars = {}
-app.config['UPLOAD_FOLDER'] = app.local_vars.get('DB_PATH') or 'data'
-sftp_config = SftpConfig((app.local_vars.get('DB_FILE') or '.sftp'), app.local_vars.get('DB_PATH') or './data')
-thread_files = []
+app.config['UPLOAD_FOLDER'] = data_path
+api = Api(app)
 
-def thread_remove_zip(filepath, thread_files, *args):
-    if filepath in thread_files: return False
-    thread_files.append(filepath)
-    time.sleep(3600)
-    os.remove(filepath)
-    thread_files.remove(filepath)
+class BaseAPI():
+    # Класс для хранения рабочей копии
+    working_copy = WorkingCopy(data_path)
 
-def zipdir(path, ziph):
-    for root, dirs, files in os.walk(path):
-        for file in files:
-            ziph.write(os.path.join(root, file), basename(os.path.join(root, file)))
+class HashAPI(Resource, BaseAPI):
+    # Класс для получения хеша директории
+    def _validate(self,path):
+        if not path:
+            return 'Path not specified.'
 
-def validate_forms(data):
-    error_flag = False
-    required_keys = ["InputHost", "InputPort", "InputLogin", "InputPassword"]
-    if len([item for item in data if item not in required_keys]): error_flag = True
-    if len([item for item in data if not data[item]]): error_flag = True
-    if not str(data.get("InputPort")).isnumeric(): error_flag = True
-    return error_flag
+    def get(self):
+        # Возвращает хеш запрошенного пути
+        d = None,None
+        path = request.args.get('path')
+        e = self._validate(path)
+        if not e:
+            d, e = self.working_copy.hash(path)
+        return jsonify({'data': d, 'error': e})
 
-@app.route('/api/v1/upload', methods=['POST'])
-def upload_file():
-    return Response('Hello', 200)
+class ListAPI(Resource,BaseAPI):
+    # Класс для просмотра рабочей директории
+    def _validate(self, path):
+        if not path:
+            return 'Path not specified.'
 
-@app.route('/api/v1/files/<path:filename>', methods=['GET'])
-def files_operation_get(filename):
-    global thread_files
-    current = os.path.dirname(os.path.abspath(__file__))
-    file_path = os.path.join(current, app.config['UPLOAD_FOLDER'])
-    if '/' in filename:
-        add_to_path = filename.split('/')[:1]
-        filename = filename.split('/')[-1]
-        file_path = os.path.join(file_path, *add_to_path)
+    def patch(self):
+        # Возвращает файл для скачивания или json с ошибкой
+        d = None,None
+        path = request.args.get('path')
+        e = self._validate(path)
+        if not e:
+            d, e = self.working_copy.get(path)
+            if not e:
+                return send_from_directory(d['directory'],d['filename'],as_attachment=True)
+        return jsonify({'data': d, 'error': e})
 
-    if os.path.isdir(os.path.join(file_path,filename)):
-        filename_tmp = '{}.zip'.format(filename)
-        file_path_tmp = file_path.replace(data_path, 'tmp')
-        zipf = zipfile.ZipFile(os.path.join(file_path_tmp,filename_tmp), 'w', zipfile.ZIP_DEFLATED)
-        zipdir(os.path.join(file_path,filename), zipf)
-        zipf.close()
+    def get(self):
+        # Возвращает информацию о запрошеном пути
+        d = None,None
+        path = request.args.get('path')
+        e = self._validate(path)
+        if not e:
+            d, e = self.working_copy.get(path)
+        return jsonify({'data': d,'error':e})
 
-        file_path = file_path_tmp
-        threading.Thread(target=thread_remove_zip,args=(os.path.join(file_path,filename_tmp), thread_files)).start()
-        return send_from_directory(directory=file_path, filename=filename_tmp)
+class DirectoryAPI(Resource,BaseAPI):
+    # Класс для работы с файлами - загрузка, удаление, добавление
+    def _validate(self, path):
+        if not path:
+            return 'Path not specified.'
 
-    return send_from_directory(directory=file_path, filename=filename, mimetype='application/octet-stream')
+    def get(self):
+        # Возвращает файл для скачивания или json с ошибкой
+        d = None,None
+        path = request.args.get('path')
+        e = self._validate(path)
+        if not e:
+            d, e = self.working_copy.get(path)
+            if not e:
+                return send_from_directory(d['directory'],d['filename'],as_attachment=True)
+        return jsonify({'data': d, 'error': e})
 
-@app.route('/api/v1/files/<path:filename>', methods=['POST', 'DELETE'])
-def files_operation_post(filename):
-    global sftp_object, sftp_status
-    current = os.path.dirname(os.path.abspath(__file__))
-    file_path = os.path.join(current, app.config['UPLOAD_FOLDER'])
-    path_to_upload = file_path
-    if '/' in filename:
-        add_to_path = filename.split('/')[:-1]
-        filename = filename.split('/')[-1]
-        file_path = os.path.join(file_path, *add_to_path)
+    def delete(self):
+        description = ''
+        class_description = 'alert alert-primary'
+        path = request.args.get('path')
+        e = self._validate(path)
+        if e: return jsonify({'description': e})
+        description, error = self.working_copy.delete(path)
+        return jsonify({'error':error,'description': description,'class_description':class_description})
 
-        for directory in add_to_path:
-            path_to_upload = os.path.join(path_to_upload, directory)
-            if not os.path.exists(path_to_upload):
-                os.mkdir(path_to_upload)
+    def post(self):
+        description = ''
+        class_description = 'alert alert-primary'
+        path = request.args.get('path')
+        create_directory = request.args.get('directory')
+        e = self._validate(path)
+        if e: return jsonify({'description': e})
+        try:
+            if request.data:
+                filename, directory = self.working_copy.prepare(path)
+                try:
+                    with open(os.path.join(directory,filename),'wb') as stream:
+                        stream.write(request.data)
+                    description = 'Файл "{}" успешно записан.'.format(filename)
+                except:
+                    print(format_exc())
+                    description = 'Произошла ошибка при записи файла.'
+            elif bool(create_directory):
+                filename, directory = self.working_copy.prepare(path,mkdir=True)
+                description = 'Была создана новая директория "{}".'.format(filename)
+            else:
+                description = 'Данные не были получены от клиента.'
+        except:
+            print(format_exc())
+            description = 'Произошла ошибка при создании директории.'
+        return jsonify({'description': description,'class_description':class_description})
 
-    file_path = os.path.join(file_path, filename)
-    if request.method == 'DELETE':
-        if os.path.isdir(file_path): os.rmdir(file_path)
-        else: os.remove(file_path)
-        return Response('Ok', 200)
+class SyncAPI(Resource,BaseAPI):
+    # Класс для синхронизации с сервером
+    def _parser_answer(self,data:dict):
+        # Метод для преобразования результатов синхронизации в строку
+        msg = ''
+        possible_keys = {'add_folder': 'Добавлено директорий',
+                         'add_file': 'Добавлено файлов',
+                         'remove_folder': 'Удалено директорий',
+                         'remove_file': 'Удалено файлов',
+                         'change_file': 'Изменено файлов'}
 
-    if request.data:
-        upload_file = open(file_path, 'wb')
-        upload_file.write(request.data)
-        upload_file.close()
+        for item in possible_keys:
+            if item in data:
+                msg += '{}: "{}". '.format(possible_keys[item],str(data[item]))
 
-    return Response('Ok', 200)
+        return msg
 
-@app.route('/api/v1/local')
-def get_local_catalog():
-    data = []
-    global sftp_object, sftp_status
-    if sftp_status and sftp_object:
-        sftp_object.build_local_map()
-        object = OutputData(sftp_object.local_map, '/api/v1/files')
-        data = object.generate()
-    return jsonify(data)
+    def post(self):
+        # Метод, для вызова синхронизации
+        description = ''
+        parser = reqparse.RequestParser()
+        parser.add_argument('action', type=str, help='Defines the type of synchronization.')
+        parser.add_argument('remove', type=str, help='Whether to delete data.')
+        args = parser.parse_args()
+        if args['remove'].lower() == 'false': args['remove'] = False
+        else: args['remove'] = True
 
-@app.route('/api/v1/connect', methods=['POST'])
-def connect_to_server():
-    global sftp_object, sftp_status
-    connection = 0
-    if sftp_status and sftp_object:
-        sftp_object._connect()
-        if not sftp_object.error:
-            connection = int(sftp_object.connect)
-    return jsonify({'status': connection})
+        obj = Sync(self.working_copy,config_path)
+        if args['action'] not in ['to','from']:
+            return jsonify({'description':'Указанная операция не поддерживается.',
+                            'class_description':"alert alert-danger"})
 
-@app.route('/api/v1/disconnect', methods=['POST'])
-def disconnect_from_server():
-    global sftp_object, sftp_status
-    connection = 1
-    if sftp_status and sftp_object:
-        sftp_object.close()
-        if not sftp_object.error:
-            connection = int(sftp_object.connect)
-    return jsonify({'status': connection})
+        data, s_error, m_errors = obj.sync(action=args['action'],remove=args['remove'])
+        if s_error:
+            description += s_error + ' '
+        if m_errors:
+            description += m_errors + ' '
+        if not data and (s_error or m_errors):
+            return jsonify({'description': 'Ошибка синхронизации. {}'.format(description),
+                            'class_description':"alert alert-danger"})
+        elif not data:
+            return jsonify({'description': 'Нет объектов подлежащих синхронизации. {}'.format(description),
+                            'class_description':"alert alert-warning"})
 
-@app.route('/api/v1/sconnect', methods=['GET'])
-def get_connection():
-    global sftp_object, sftp_status
-    connection = 0
-    if sftp_status and sftp_object: connection = int(sftp_object.connect)
-    return jsonify({'status': connection})
+        return jsonify({'description':self._parser_answer(data) + description,'class_description':'alert alert-primary'})
 
-@app.route('/api/v1/conf', methods=['GET', 'POST'])
-def get_config():
-    global sftp_object, sftp_status
-    data = dict(request.form)
-    data = {item:data[item][0] for item in data if len(data[item]) == 1}
-    check = validate_forms(data)
-    if not check:
-        parms = {}
-        parms['host'] = data["InputHost"]
-        parms['port'] = data["InputPort"]
-        parms['login'] = data["InputLogin"]
-        parms['password'] = data["InputPassword"]
-        sftp_config.set(parms)
-        sftp_object, sftp_status = sftp_config.reinit()
-        if sftp_status : sftp_config.write()
-    return jsonify({'validate': int(check),'status':int(sftp_status)})
 
-@app.route('/api/v1/status', methods=['GET'])
-def get_status():
-    def gt(): return datetime.datetime.now()
-    global sftp_object,sftp_config,sftp_status
-    if sftp_object and sftp_object.sync_time:
-        sync_time = datetime.datetime.fromtimestamp(int(sftp_object.sync_time))
-        error_status = int(sftp_object.error)
-    else:
-        sync_time = 0
-        error_status = 1
+class ConfigAPI(Resource):
+    # Класс для работы с конфигурацией SFTP
+    def post(self):
+        # Метод, для получения конфигурации
+        description = ''
+        parser = reqparse.RequestParser()
+        parser.add_argument('host', type=str, help='Defines the type of synchronization.')
+        parser.add_argument('port', type=int, help='Whether to delete data.')
+        parser.add_argument('login', type=str, help='Defines the type of synchronization.')
+        parser.add_argument('password', type=int, help='Whether to delete data.')
+        args = parser.parse_args()
 
-    if sftp_config.isinit:
-        is_init = 1
-        init_time = datetime.datetime.fromtimestamp(int(sftp_config.init_time))
-    else:
-        is_init = 0
-        init_time = 0
+        check_list = ['host','port','login','password']
+        for item in check_list:
+            if item not in args or not args[item]:
+                return jsonify({'description': 'Получены недопустимые значения.',
+                                'class_description':"alert alert-danger"})
 
-    connection = 0
-    connect_time = 0
-    if sftp_status and sftp_object:
-        connection = int(sftp_object.connect)
-        if sftp_object.connect_time:
-            connect_time = int((gt() - datetime.datetime.fromtimestamp(int(sftp_object.connect_time))).total_seconds())
+        try:
+            data = {'host':args['host'],'port':args['port'],'login':args['login'],'password':args['password']}
+            pickle.dump(data, open(config_path, 'wb'))
+        except:
+            return jsonify({'description': 'Не удалось записать конфигурацию.',
+                            'class_description': "alert alert-danger"})
 
-    return jsonify({'config': {'status': is_init, 'time': init_time},
-                    'sync': {'status': error_status, 'time': sync_time},
-                    'connect': {'status': connection, 'time': connect_time}})
+        return ({'description':'Конфигурация успешно записана.','class_description':'alert alert-primary'})
 
-@app.route('/api/v1/init', methods=['POST'])
-def reinit_config():
-    global sftp_object, sftp_status
-    sftp_object, sftp_status = sftp_config.reinit()
-    return jsonify({'status': int(sftp_status)})
+api.add_resource(DirectoryAPI, '/api/v2/directory')
+api.add_resource(SyncAPI, '/api/v2/directory/sync')
+api.add_resource(HashAPI, '/api/v2/directory/hash')
+api.add_resource(ListAPI, '/api/v2/directory/list')
+api.add_resource(ConfigAPI, '/api/v2/config')
 
-@app.route('/api/v1/repo/<operation>', methods=['POST'])
-def repository_actions(operation):
-    global sftp_object
-    if sftp_object:
-        actions = {'upload': sftp_object.smart_upload,
-                   'modify': sftp_object.smart_modify,
-                   'download': sftp_object.smart_sync,
-                   'clean': sftp_object.sync}
-
-        if actions.get(operation):
-            logs, error_status = actions[operation]()
-        else:
-            error_status = 1
-            logs = []
-    else:
-        error_status = 1
-        logs = []
-    return jsonify({'error_status':error_status,'logs':logs})
-
-@app.route('/api/v1/sync', methods=['POST'])
-def smart_sync():
-    return repository_actions('download')
-
-@app.route('/api/v1/clean', methods=['POST'])
-def clean_sync():
-    return repository_actions('clean')
-
-@app.route('/', methods=['GET'])
+@app.route('/')
 def main_page():
-    return render_template('main.html')
+    return render_template('sftp.html')
 
-@app.route('/conf', methods=['GET'])
-def config_page():
-    return render_template('conf.html')
+@app.route('/config')
+def conf_page():
+    return render_template('config.html')
 
-@app.route('/help', methods=['GET'])
-def help_me():
+@app.route('/help')
+def help_page():
     return render_template('help.html')
 
 if __name__ == '__main__':
-    sftp_object, sftp_status = sftp_config.init()
-    app.run(host="0.0.0.0", port=5999, threaded=True)
+    app.run(host="0.0.0.0", port=5888, threaded=True)

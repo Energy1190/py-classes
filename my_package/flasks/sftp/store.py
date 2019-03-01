@@ -1,32 +1,243 @@
 import os
+import re
 import stat
 import time
-import shutil
 import pickle
+import shutil
+import hashlib
 import paramiko
+import collections
+from shutil import copyfile
 from traceback import format_exc
 
-class Empty():
-    def close(self):
-        return True
+def connector(func):
+    # Декоратор для соединения с sftp
+    def wrapper(*args,**kwargs):
+        # args[0] == self
+        if not hasattr(args[0],'_check_connect'): return None
+        if not hasattr(args[0], 'close'): return None
+        if not args[0]._check_connect(): return None
+        try: return func(*args,**kwargs)
+        except:
+            print(format_exc())
+            return None
+    return wrapper
 
-class SftpConnection():
-    def __init__(self, host, port, username, password):
-        self.host = host
-        self.port = int(port)
-        self.username = username
-        self.password = password
+def shutter(func):
+    # Декоратор для разъединения с sftp
+    def wrapper(*args,**kwargs):
+        # args[0] == self
+        if not hasattr(args[0], 'remote_copy'): return None
+        if not hasattr(args[0].remote_copy, 'close'): return None
+        try: return func(*args,**kwargs)
+        except:
+            print(format_exc())
+            return None
+        finally:
+            args[0].remote_copy.close()
+    return wrapper
 
+class Store():
+    # Класс для сравнения директорий
+    def __init__(self,body:dict):
+        self.obj = self._format_input(body)
+
+    def _format_input(self, obj, objects_list=None):
+        # Привидение данных к нужному типу
+        # Возвращает список словарей
+        if type(obj) == tuple:
+            obj = obj[0]
+
+        if obj.get('path') == '':
+            obj['path'] = '.'
+
+        obj['path'] = obj['path'].replace('\\','/')
+        if not re.match('^\./',obj['path']) and obj['path'] != '.':
+            obj['path'] = './{}'.format(obj['path'])
+
+        result = {}
+        objects_list = objects_list or []
+        result['path'] = obj.get('path').replace('\\','/')
+        result['type'] = (obj.get('stat') and not stat.S_ISDIR(obj.get('stat').st_mode) and 'file') or 'directory'
+        result['size'] = (obj.get('stat') and obj['stat'].st_size) or 0
+        objects_list.append(result)
+        obj.get('include') and [self._format_input(elem,objects_list) for elem in obj.get('include')]
+        return objects_list
+
+    def sync(self, obj):
+        # Метод синхронизации, возвращает список необходимых операций
+        cmd_list = []
+        description = ''
+        try:
+            obj = self._format_input(obj)
+        except:
+            description = 'Не удалось обработать входящие данные.'
+            return cmd_list,description
+
+        print('Start sync.')
+        for item in obj:
+            if item['path'] not in [litem['path'] for litem in self.obj]:
+                print(' - Item: "{}" need to by add.'.format(item['path']))
+                cmd_list.append(((item['path']), 'add', item['type']))
+
+            elif item['type'] == 'file':
+                size = [litem['size'] for litem in self.obj if item['path'] == litem['path']][0]
+                if int(item['size']) != int(size):
+                    print(' - Item: "{}" need to by change.'.format(item['path']))
+                    cmd_list.append(((item['path']), 'modify', item['type']))
+
+        for item in self.obj:
+            if item['path'] not in [litem['path'] for litem in obj]:
+                print(' - Item: "{}" need to by remove.'.format(item['path']))
+                cmd_list.append(((item['path']), 'remove', item['type']))
+
+        print('End sync.')
+        return cmd_list, description
+
+class WorkingCopy():
+    # Класс описывающий рабочую директорию
+    def __init__(self, path):
+        self.path = path
+
+    def _sort_func(self, *args):
+        # Сортировка данных, для того, что бы папки всегда были вверху списка
+        if not len(args):
+            return False
+        if not len(args[0]):
+            return False
+        if not hasattr(args[0][0],'get'):
+            return False
+        return (args[0][0].get('directoryname') or '')
+
+    def get(self, path):
+        # Метод для получения данных о рабочей копии
+        e = None
+        if path == '.': path = ''
+        fullpath = os.path.join(self.path,path)
+
+        try:
+            if os.path.isfile(fullpath):
+                data = {'path':path,
+                        'stat':os.stat(fullpath),
+                        'fullpath':fullpath,
+                        'filename':fullpath.split(os.sep)[-1],
+                        'directoryname':None,
+                        'directory_path':'\\'.join(path.split('\\')[:-1]),
+                        'file_path':path,
+                        'directory': os.sep.join(fullpath.split(os.sep)[:-1])}
+            elif os.path.isdir(fullpath):
+                data = {'path':path,
+                        'include':sorted([self.get(os.path.join(path,item)) for item in os.listdir(fullpath)],key=self._sort_func,reverse=True),
+                        'fullpath':fullpath,
+                        'filename': None,
+                        'directoryname':fullpath.split(os.sep)[-1],
+                        'directory_path': path,
+                        'file_path': None,
+                        'directory': fullpath}
+            else:
+                data = {}
+        except:
+            print(format_exc())
+            data = None,None
+            e = format_exc()
+
+        return data,e
+
+    def hash(self, path):
+        # Метод для получения хеша рабочей директории
+        e = None
+        result = hashlib.md5()
+        if path == '.': path = ''
+        fullpath = os.path.join(self.path,path)
+        try:
+            for root, dirs, files in os.walk(fullpath):
+                for file in files:
+                    filepath = os.path.join(root,file)
+                    result.update(filepath.encode('utf-8'))
+
+        except:
+            print(format_exc())
+            result = None
+            e = format_exc()
+
+        if hasattr(result,'hexdigest'):
+            result = result.hexdigest()
+
+        return result,e
+
+    def prepare(self, path,mkdir=False):
+        # Подготавливает путь для записи
+        filename = None
+        directory = os.sep.join(path.replace('\\', os.sep).split(os.sep))
+        if not os.path.isdir(os.path.join(self.path,directory)):
+            filename = path.replace('\\', os.sep).split(os.sep)[-1]
+            directory = os.sep.join(path.replace('/',os.sep).replace('\\', os.sep).split(os.sep)[:-1])
+            if directory.split(os.sep)[-1] == '.':
+                directory = os.sep.join(directory.split(os.sep)[:-1])
+        check, e = self.get(directory)
+        if not check:
+            os.mkdir(os.path.join(self.path,directory))
+
+        if mkdir:
+            os.mkdir(os.path.join(self.path, directory,filename))
+
+        return filename, os.path.join(self.path,directory)
+
+    def delete(self, path):
+        # Удаляет файл или директорию, возвращает два флага - успех и ошибку
+        path = path.replace('/',os.sep).replace('\\', os.sep)
+        fullpath = os.path.join(self.path,path)
+        try:
+            if os.path.exists(fullpath) and os.path.isfile(fullpath):
+                os.remove(fullpath)
+                return True, False
+            elif os.path.exists(fullpath) and os.path.isdir(fullpath):
+                shutil.rmtree(fullpath)
+                return True, False
+            else:
+                return False, False
+        except:
+            return False,True
+
+class RemoteCopy():
+    # Класс описывающий директорию на сервере
+    DB_FILE = '.sftp' # Путь к файлу хранения данных о сервере
+    def __init__(self):
+        self.host = None
+        self.port = None
+        self.username = None
+        self.password = None
+
+        self.path = None
         self.error = False
         self.connect = False
-        self.connection = Empty()
-        self.sftp = Empty()
 
-        self.map = {}
-        self.connect_time = 0
+    def create_from_vars(host,port,username,password):
+        obj = RemoteCopy()
+        obj.host = host
+        obj.port = int(port)
+        obj.username = username
+        obj.password = password
+        return obj
+
+    def create_from_file():
+        if os.path.exists(RemoteCopy.DB_FILE):
+            raw = pickle.load(open(RemoteCopy.DB_FILE,'rb'))
+
+            data_list = ['host', 'port', 'login', 'password']
+            for item in data_list:
+                if item not in list(raw) or not raw.get(item):
+                    return None
+
+            return RemoteCopy.create_from_vars(raw['host'],raw['port'],raw['login'],raw['password'])
 
     def get_time(self):
         return time.time()
+
+    def _save_to_file(self):
+        if os.path.exists(self.DB_FILE): os.remove(self.DB_FILE)
+        data = {'host':self.host,'port':self.port,'login':self.username,'password':self.password}
+        pickle.dump(data,open(RemoteCopy.DB_FILE, 'wb'))
 
     def _preparation(self):
         try:
@@ -59,434 +270,169 @@ class SftpConnection():
         self.connect_time = 0
         self.connect = False
 
-    def listdir(self, path):
-        result = None
-        if not self._check_connect(): return None
-        try:
-            result = self.sftp.listdir(path)
-        except:
-            self.error = True
-            print(format_exc())
-
-        return result
-
-    def listdir_attr(self, path):
-        result = None
-        if not self._check_connect(): return None
-        try:
-            result = self.sftp.listdir_attr(path)
-        except:
-            self.error = True
-            print(format_exc())
-
-        return result
-
-    def build_map(self, path=None, level=0, object=None):
+    @connector
+    def listdir(self, path=None):
+        # Метод получения данных о директории
         if not path: path = '.'
-        if type(object) != dict: object = self.map
-
+        e = None
         try:
-            names = self.listdir(path)
-            attr = self.listdir_attr(path)
-            for num in range(len(names)):
-                new_path = path + '/' + names[num]
-                object[new_path] = {}
-                object[new_path]['att'] = attr[num]
-                object[new_path]['size'] = attr[num].st_size
-                object[new_path]['dir'] = stat.S_ISDIR(attr[num].st_mode)
-                object[new_path]['path'] = new_path
-                object[new_path]['level'] = level
-                object[new_path]['childs'] = {}
-                if object[new_path]['dir']:
-                    new_level = level + 1
-                    self.build_map(object[new_path]['path'], level=new_level, object=object[new_path]['childs'])
+            obj = self.sftp.stat(path)
+            data = {'path':path,
+                    'stat': obj}
+            if stat.S_ISDIR(obj.st_mode):
+                data['directoryname'] = path
+                data['directory_path'] = path
+                data['filename']  = None
+                data['file_path'] = None
+                data['include'] = [self.listdir('/'.join([path,item])) for item in self.sftp.listdir(path)]
+            else:
+                data['directoryname'] = None
+                data['directory_path'] = None
+                data['filename']  = path
+                data['file_path'] = path
 
-            if not level:
-                return self.map
+            if self.path:
+                data['fullpath'] = os.path.join(self.path,path.replace('/', os.sep))
+
         except:
-            self.error = True
+            data = None, None
             print(format_exc())
-            return []
+            e = format_exc()
 
+        return data,e
 
-class LocalStore():
-    def __init__(self, path=None):
-        self.path = path
-        self._check_dir()
+    @connector
+    def get(self,remotepath,localpath):
+        # Метод-обертка для sftp.get
+        return self.sftp.get(remotepath,localpath)
 
-        self.local_map = {}
+    @connector
+    def put(self,remotepath,localpath):
+        # Метод-обертка для sftp.put
+        return self.sftp.put(localpath,remotepath)
 
-    def _check_dir(self):
-        if not os.path.exists(self.path):
-            os.mkdir(self.path)
+    @connector
+    def delete(self,path):
+        # Метод-обертка для sftp.remove
+        return self.sftp.remove(path)
 
-    def build_local_map(self, path=None, lpath=None, level=0, object=None):
-        def ld(path_to):
-            return os.listdir(path_to)
+    @connector
+    def mkdir(self,path,mode=511):
+        # Метод-обертка для sftp.mkdir
+        return self.sftp.mkdir(path,mode=mode)
 
-        if not path: path = '.'
-        if not lpath:
-            lpath = self.path
+    @connector
+    def rmdir(self,path):
+        # Метод-обертка для sftp.rmdir
+        return self.sftp.rmdir(path)
+
+class Sync():
+    # Класс описывающий процесс синхронизации
+    def __init__(self, working_copy:WorkingCopy,remote_copy_cfg):
+        self.errors = ''
+        self.local_copy = working_copy
+
+        RemoteCopy.DB_FILE = remote_copy_cfg
+        self.remote_copy = RemoteCopy.create_from_file()
+
+        self.sync_array_to = {'add':{
+                                    'file': self.remote_copy.put,
+                                    'folder': self.remote_copy.mkdir
+                                },
+                              'remove':{
+                                    'file': self.remote_copy.delete,
+                                    'folder': self.remote_copy.rmdir
+                                }}
+
+        self.sync_array_from = {'add':{
+                                    'file': self.remote_copy.get,
+                                    'folder': os.mkdir
+                                },
+                              'remove':{
+                                    'file': os.remove,
+                                    'folder': os.rmdir
+                                }}
+
+    @shutter
+    def sync(self,action=None,remove=False):
+        # Универсальный метод синхронизации
+        fullpath = None
+        counters = collections.defaultdict(int)
+        if action == 'to':
+            dataset = self.local_copy.get('.')
+            functions = self.sync_array_to
+            container = Store(self.remote_copy.listdir('.'))
+        elif action == 'from':
+            dataset = self.remote_copy.listdir('.')
+            functions = self.sync_array_from
+            fullpath = os.path.join
+            container = Store(self.local_copy.get('.'))
         else:
-            lpath = lpath.replace('./', '{}/'.format(self.path), 1)
+            return counters,'Тип операции не поддерживается.'
 
-        if type(object) != dict: object = self.local_map
+        cmd_list, error = container.sync(dataset)
+        if error:
+            return counters, error, self.errors
 
-        for item in ld(lpath):
-            new_path = path + '/' + item
-            full_path = new_path.replace('./', '{}/'.format(self.path), 1)
-            object[new_path] = {}
-            object[new_path]['att'] = os.stat(full_path)
-            object[new_path]['size'] = os.stat(full_path).st_size
-            object[new_path]['dir'] = os.path.isdir(full_path)
-            object[new_path]['path'] = new_path
-            object[new_path]['level'] = level
-            object[new_path]['childs'] = {}
-            if object[new_path]['dir']:
-                new_level = level + 1
-                self.build_local_map(object[new_path]['path'], object[new_path]['path'],
-                                     level=new_level,
-                                     object=object[new_path]['childs'])
-        if not level:
-            return self.local_map
+        print('Start apply sync result.')
+        for item in cmd_list:
+            self._sync_step_1(item,functions,counters,fullpath,remove=remove)
+        for item in cmd_list:
+            self._sync_step_2(item,functions,counters,fullpath,remove=remove)
 
+        print('Apply sync result. Done.')
+        return counters,None,self.errors
 
-
-class SftpSync(SftpConnection, LocalStore):
-    def __init__(self, *args, **kwargs):
-        SftpConnection.__init__(self, *args)
-        LocalStore.__init__(self, **kwargs)
-        self.sync_time = 0
-
-    def _convert_path_to_local(self, name):
-        remote_path = name
-        local_path = str(name).replace('./', '{}/'.format(self.path), 1)
-        return remote_path, local_path
-
-    def _convert_path_to_remote(self, name):
-        local_path = name
-        remote_path = str(name).replace(self.path, './', 1)
-        if '//' in remote_path: remote_path = remote_path.replace('//', '/', 1)
-        return remote_path, local_path
-
-    def get(self, name):
-        remote, local = self._convert_path_to_local(name)
-        if not self._check_connect(): return None
+    def _sync_step_1(self,item,functions,counters,fullpath,remove=False):
+        # Метод обрабатывающий шаг синхронизации
+        # Первым шагом идет добавление директорий и удаление файлов,
+        # что бы не возникло конфликтов при удалении не пустых папок и
+        # создании файлов в еще не созданных папках
+        # TODO: через fullpath передается проверка пути, которая обеспечивает совместимость с локальной ОС. Костыль-с
+        # TODO: сортировать команды по длинне пути (ошибка при рекурсивном удалении папок)
+        path, action, o_type = item
         try:
-            self.sftp.get(remote, local)
+            if action == 'add' and o_type == 'directory':
+                tmp = path
+                if callable(fullpath):
+                    tmp = fullpath(self.local_copy.path,os.path.normpath(path))
+                functions['add']['folder'](tmp)
+                counters['add_folder'] += 1
+                print('- Item: "{}" added'.format(path))
+
+            elif action == 'remove' and o_type == 'file' and remove:
+                tmp = path
+                if callable(fullpath):
+                    tmp = fullpath(self.local_copy.path,os.path.normpath(path))
+                functions['remove']['file'](tmp)
+                counters['remove_file'] += 1
+                print('- Item: "{}" removed'.format(path))
         except:
-            self.error = True
             print(format_exc())
+            self.errors += 'Error in item: "{}"\n'.format(path)
 
-        return True
-
-    def put(self, name):
-        remote, local = self._convert_path_to_remote(name)
-        if not self._check_connect(): return None
+    def _sync_step_2(self,item,functions,counters,f_fullpath,remove=False):
+        # Метод обрабатывающий шаг синхронизации
+        # Второй шаг, все остальные операции, которые не были сделаны в первом шаге
+        # Операция модификации эквивалентна операции добавления.
+        path, action, o_type = item
+        fullpath = os.path.join(self.local_copy.path, os.path.normpath(path))
         try:
-            self.sftp.put(local, remote)
+            if action == 'add' and o_type == 'file':
+                functions['add']['file'](path, fullpath)
+                counters['add_file'] += 1
+                print('- Item: "{}" added'.format(path))
+            elif action == 'modify' and o_type == 'file':
+                functions['add']['file'](path, fullpath)
+                counters['change_file'] += 1
+                print('- Item: "{}" changed'.format(path))
+            elif action == 'remove' and o_type == 'directory' and remove:
+                tmp = path
+                if callable(f_fullpath):
+                    tmp = f_fullpath(self.local_copy.path,os.path.normpath(path))
+                functions['remove']['folder'](tmp)
+                counters['remove_directory'] += 1
+                print('- Item: "{}" removed'.format(path))
         except:
-            self.error = True
             print(format_exc())
-
-        return True
-
-    def remove(self, name):
-        remote, local = self._convert_path_to_remote(name)
-        if not self._check_connect(): return None
-        try:
-            self.sftp.remove(remote)
-        except:
-            self.error = True
-            print(format_exc())
-
-        return True
-
-    def mkdir(self, path):
-        remote, local = self._convert_path_to_remote(path)
-        if not self._check_connect(): return None
-        try:
-            self.sftp.mkdir(remote)
-        except:
-            self.error = True
-            print(format_exc())
-
-        return True
-
-    def rmdir(self, path):
-        remote, local = self._convert_path_to_remote(path)
-        if not self._check_connect(): return None
-        try:
-            self.sftp.rmdir(remote)
-        except:
-            self.error = True
-            print(format_exc())
-
-        return True
-
-    def sync(self):
-        def cycle(items):
-            [os.mkdir(item.replace('./', '{}/'.format(self.path), 1)) for item in items if items[item]['dir']]
-            result = [self.get(item) for item in items if not items[item]['dir']]
-            results = [cycle(items[item]['childs']) for item in items if items[item]['childs']]
-            for obj in results: result += obj
-            return result
-
-        if self.error: return [], self.error
-
-        shutil.rmtree(self.path)
-        self._check_dir()
-        self.build_map()
-        self.build_local_map()
-        if self.error: return [], self.error
-
-        self.sync_time = self.get_time()
-        result = cycle(self.map)
-        if not all(result):
-            self.error = True
-            return [], self.error
-
-        return [], self.error
-
-    def smart_sync(self):
-        def cycle(items, over_items):
-            flag = False
-            sync_result = []
-            for item in items:
-                local_path = item.replace('./', '{}/'.format(self.path), 1)
-                if item not in over_items:
-                    if items[item]['dir']:
-                        os.mkdir(local_path)
-                        sync_result.append({item: 'Add directory.'})
-                    else:
-                        self.get(item)
-                        sync_result.append({item: 'Add file.'})
-                elif int(over_items[item]['size']) != int(items[item]['size']) and not items[item]['dir']:
-                    os.remove(local_path)
-                    self.get(item)
-                    sync_result.append({item: 'File changed.'})
-                else:
-                    sync_result.append({item: 'Not modified.'})
-
-                if items[item]['childs']:
-                    if not over_items.get(item): return sync_result, True
-                    result, tmp_flag = cycle(items[item]['childs'], over_items[item]['childs'])
-                    sync_result += result
-                    if not flag: flag = tmp_flag
-
-            return sync_result, flag
-
-        if self.error: return [], self.error
-
-        self._check_dir()
-        flag = True
-        counter = 0
-        self.build_map()
-        while flag:
-            self.build_local_map()
-            if self.error: return [], self.error
-            sync_result, flag = cycle(self.map, self.local_map)
-            counter += 1
-            if counter > 10: break
-        self.sync_time = self.get_time()
-
-        print(sync_result)
-        return sync_result, self.error
-
-    def smart_upload(self):
-        def cycle(items, over_items):
-            flag = False
-            sync_result = []
-            for item in items:
-                local_path = item.replace('./', '{}/'.format(self.path), 1)
-                if item not in over_items:
-                    if items[item]['dir']:
-                        self.mkdir(item)
-                        sync_result.append({item: 'Add directory.'})
-                    else:
-                        self.put(local_path)
-                        sync_result.append({item: 'Add file.'})
-                elif int(items[item]['size']) != int(over_items[item]['size']) and not items[item]['dir']:
-                    self.put(local_path)
-                    sync_result.append({item: 'File changed.'})
-                else:
-                    sync_result.append({item: 'Not modified.'})
-                if items[item]['childs']:
-                    if not over_items.get(item): return sync_result, True
-                    result, tmp_flag = cycle(items[item]['childs'], over_items[item]['childs'])
-                    sync_result += result
-                    if not flag: flag = tmp_flag
-            return sync_result, flag
-
-        if self.error: return [], self.error
-
-        self._check_dir()
-        flag = True
-        counter = 0
-        while flag:
-            self.build_map()
-            self.build_local_map()
-            if self.error: return [], self.error
-            sync_result, flag = cycle(self.local_map, self.map)
-            counter += 1
-            if counter > 10: break
-
-        return sync_result, self.error
-
-    def smart_modify(self):
-        def remove_cycle(items):
-            sync_result = []
-            for item in items:
-                local_path = item.replace('./', '{}/'.format(self.path), 1)
-                if items[item]['dir']: sync_result += remove_cycle(items[item]['childs'])
-                else:
-                    self.remove(local_path)
-                    sync_result.append({item: 'Remove file.'})
-
-            return sync_result
-
-        def cycle(items, over_items):
-            sync_result = []
-            for item in items:
-                local_path = item.replace('./', '{}/'.format(self.path), 1)
-                if item not in over_items:
-                    if items[item]['dir']:
-                        self.mkdir(item)
-                        sync_result.append({item: 'Add directory.'})
-                    else:
-                        self.put(local_path)
-                        sync_result.append({item: 'Add file.'})
-                elif int(items[item]['size']) != int(over_items[item]['size']) and not items[item]['dir']:
-                    self.put(local_path)
-                    sync_result.append({item: 'File changed.'})
-                else:
-                    sync_result.append({item: 'Not modified.'})
-
-                try:
-                    if items[item]['childs'] or over_items[item]['childs']:
-                        sync_result += cycle(items[item]['childs'], over_items[item]['childs'])
-                except KeyError:
-                    print('Key Error. IN:')
-                    print('----- ITEM:', item)
-
-            for item in over_items:
-                local_path = item.replace('./', '{}/'.format(self.path), 1)
-                if item not in items:
-                    try:
-                        try:
-                            if over_items[item]['childs']:
-                                sync_result += remove_cycle(over_items[item]['childs'])
-                        except:
-                            sync_result.append({item: 'Remove error.'})
-                            print(format_exc())
-
-                        if over_items[item]['dir']:
-                            self.rmdir(local_path)
-                            sync_result.append({item: 'Remove folder.'})
-                        else:
-                            self.remove(local_path)
-                            sync_result.append({item: 'Remove file.'})
-
-                    except:
-                        sync_result.append({item: 'Remove error.'})
-                        print(format_exc())
-
-            return sync_result
-
-        if self.error: return [], self.error
-
-        self._check_dir()
-        self.build_map()
-
-        if self.error: return [], self.error
-
-        sync_result = cycle(self.local_map, self.map)
-        print(sync_result)
-        return sync_result, self.error
-
-class SftpConfig():
-    def __init__(self, path, data_path):
-        self.path = path
-        self.data_path = data_path
-        self.sftp = None
-
-        self.host = None
-        self.port = None
-        self.login = None
-        self.password = None
-
-        self.init_time = 0
-
-    def set(self, data):
-        self.host = data['host']
-        self.port = data['port']
-        self.login = data['login']
-        self.password = data['password']
-
-    def get(self):
-        return {'host': self.host, 'port': self.port,
-                'login': self.login, 'password': self.password}
-
-    def read(self):
-        if os.path.exists(self.path): return pickle.load(open(self.path,'rb'))
-        else: return None
-
-    def write(self):
-        if os.path.exists(self.path): os.remove(self.path)
-        pickle.dump(self.get(),open(self.path, 'wb'))
-
-    def get_time(self):
-        return time.time()
-
-    def init(self):
-        confing = self.read()
-        if confing:
-            self.set(confing)
-            self.init_time = self.get_time()
-            self.sftp = SftpSync(confing['host'],confing['port'],confing['login'],confing['password'],path=self.data_path)
-            self.isinit = True
-        else:
-            self.isinit = False
-
-        return self.sftp, self.isinit
-
-    def reinit(self):
-        if self.sftp: self.sftp.close()
-        self.init_time = self.get_time()
-        self.sftp = SftpSync(self.host,self.port,self.login,self.password,path=self.data_path)
-        self.isinit = True
-
-        return self.sftp, self.isinit
-
-class OutputData():
-    def __init__(self, map, store, color="#000000", backColor="#FFFFFF",
-                 icon="fas fa-folder",
-                 selectedIcon="glyphicon glyphicon-stop"):
-        self.map = map
-        self.store = store
-        self.result = []
-
-        self.color = color
-        self.back_color = backColor
-        self.icon = icon
-        self.selected_icon = selectedIcon
-
-    def generate(self, list_dict=None, write_to=None, level=0):
-        if not list_dict: list_dict = self.map
-        if type(write_to) != list: write_to = self.result
-
-        for item in list_dict:
-            href = '{}{}'.format(self.store, item[1:])
-            childs = []
-            if list_dict[item]['dir'] and list_dict[item]['childs']:
-                self.generate(list_dict=list_dict[item]['childs'],write_to=childs,level=level + 1)
-
-            if list_dict[item]['dir']: icon = "fas fa-folder"
-            else: icon = "fas fa-file"
-
-            write_to.append({'text': ' {}'.format(item), 'href': href, 'nodes': childs,
-                             'icon': icon, 'selectedIcon': icon,
-                             'color': self.color, 'backColor': self.back_color})
-
-        if not level: return self.result
-        else: return childs
+            self.errors += 'Error in item: "{}"\n'.format(path)

@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block title %}CONFIG{% endblock %}
+{% block script %}
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+{% endblock %}
+{% block content %}
+<div class="container">
+    <div class="row card">
+        <div class="card-body">
+            <h5 class="card-title">Конфигурация</h5>
+            <div class="row col checkbox">
+              <label id="status"></label>
+            </div>
+            <div class="row">
+                <div class="col-sm-12 col-md-3 col-xl-3"><label>Имя сервера:</label></div>
+                <div class="col-sm-12 col-md-3 col-xl-3">
+                    <input type="text" class="form-control" id="servC">
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-sm-12 col-md-3 col-xl-3"><label>Порт сервера:</label></div>
+                <div class="col-sm-12 col-md-3 col-xl-3">
+                    <input type="text" class="form-control" id="portC">
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-sm-12 col-md-3 col-xl-3"><label>Имя пользователя:</label></div>
+                <div class="col-sm-12 col-md-3 col-xl-3">
+                    <input type="text" class="form-control" id="userC">
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-sm-12 col-md-3 col-xl-3"><label>Пароль:</label></div>
+                <div class="col-sm-12 col-md-3 col-xl-3">
+                    <input type="password" class="form-control" id="passC">
+                </div>
+            </div>
+            <div class="row">
+                <div class="col-sm-12 col-md-3 col-xl-3"><label>Загрузить конфигурацию:</label></div>
+                <div class="col-sm-12 col-md-3 col-xl-3">
+                    <button type="button" class="btn btn-primary btn-block" onclick="send_config()" id="conf_btn">Отправить</button></div>
+            </div>
+        </div>
+    </div>
+    <div id="messenger">
+    </div>
+</div>
+{% endblock %}
+{% block postscript %}
+function send_config() {
+    var server = document.getElementById("servC").value;
+    var server_port = document.getElementById("portC").value;
+    var login = document.getElementById("userC").value;
+    var login_pass = document.getElementById("passC").value;
+
+    var array = [server,server_port,login,login_pass]
+    for (var num in array) {
+        if (!array[num]) {
+            show_msg("Вы не заполнили поля формы." + this.status,"alert alert-danger");
+            return false;
+        }
+    }
+
+    $.ajax({
+        url:'/api/v2/config',
+        type:'POST',
+        data: {
+            host: server,
+            port: server_port,
+            login: login,
+            password: login_pass
+        },
+        timeout: 30000,
+        error: function(){
+            show_msg("Не удалось отправить конфигурацию. Сервер ответил: " + this.status,"alert alert-danger");
+        },
+        success:function(result) {
+            show_msg(result['description'],result['class_description']);
+        },
+        beforeSend: function(){
+            var btn = document.getElementById('conf_btn');
+            btn.disabled = false;
+        },
+        complete:function(){
+            var btn = document.getElementById('conf_btn');
+            btn.disabled = false;
+        }
+    });
+}
+{% endblock %}

@@ -1,0 +1,346 @@
+{% extends "base.html" %}
+{% block title %}SFTP{% endblock %}
+{% block script %}
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<script type="text/javascript" src="{{ url_for('static', filename='js/build.js') }}"></script>
+{% endblock %}
+{% block content %}
+<div class="container">
+    <div class="row bg-info text-white treehead">
+        <div class="col-sm-12 col-md-8 col-xl-6" id="tree_header"></div>
+    </div>
+    <div class="row treescroll" id="tree"></div>
+    <div class="row bg-info text-white treehead">
+        <div class="col-sm-12 col-md-8 col-xl-6" id="tree_footer"></div>
+    </div>
+
+    <div class="row card">
+        <div class="card-body">
+            <h5 class="card-title">Команды</h5>
+            <div class="row col checkbox">
+              <label><input type="checkbox" value="" id="approve_delete"> Разрешить удаление</label>
+            </div>
+            <div class="row">
+                <div class="col-sm-12 col-md-3 col-xl-3"><label>Отправить данные на сервер</label></div>
+                <div class="col-sm-12 col-md-3 col-xl-3"><button type="button" class="btn btn-primary btn-block" onclick="sync(resv_btn)" id="resv_btn">Отправить</button></div>
+            </div>
+            <div class="row">
+                <div class="col-sm-12 col-md-3 col-xl-3"><label>Получить данные с сервера</label></div>
+                <div class="col-sm-12 col-md-3 col-xl-3"><button type="button" class="btn btn-primary btn-block" onclick="sync(send_btn)" id="send_btn">Получить</button></div>
+            </div>
+        </div>
+    </div>
+    <div id="messenger">
+    </div>
+</div>
+{% endblock %}
+{% block postscript %}
+{# Функция преобразования байт #}
+function bytesToSize(bytes) {
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB']
+  if (bytes === 0) return 'n/a'
+  const i = parseInt(Math.floor(Math.log(bytes) / Math.log(1024)), 10)
+  if (i === 0) return `${bytes} ${sizes[i]}`
+  return `${(bytes / (1024 ** i)).toFixed(1)} ${sizes[i]}`
+}
+
+{# Функция построение элемеента таблицы с файлами #}
+function build_tr_td(textNode,name, tr) {
+    var td = document.createElement('td');
+    build_icon(td,textNode);
+    tr.appendChild(td)
+
+    var td = document.createElement('td');
+    td.appendChild(document.createTextNode(name))
+    tr.appendChild(td)
+}
+
+{# Функция построение директории для возврата в предидущий каталог #}
+function return_path(tbody) {
+    var tr = document.createElement('tr');
+    tr.className = "blinking";
+    build_tr_td('folder','..',tr);
+    var createClickHandler = function (row) {
+        return function() {
+            var urlParams = new URLSearchParams(window.location.search);
+            var path = urlParams.get('path') || '.'
+            var pathSplit = path.split('\\');
+            var newPath;
+            if (pathSplit.length == 1) {
+                newPath = '.';
+            } else {
+                newPath = pathSplit.slice(0,-1).join('\\');
+            }
+            urlParams.set('path', newPath);
+            window.location.search = urlParams.toString();
+        }
+    }
+    tr.onclick = createClickHandler(tr)
+    tbody.appendChild(tr);
+}
+{# Функция для переходов по папкам и файлам #}
+function add_onClick(tr, name) {
+    var createClickHandler = function (row) {
+        return function() {
+            var urlParams = new URLSearchParams(window.location.search);
+            var path = urlParams.get('path') || '.'
+            var newPath = path + '\\' + name
+            urlParams.set('path', newPath);
+            window.location.search = urlParams.toString();
+        }
+    }
+    tr.onclick = createClickHandler(tr)
+}
+
+{# Функция построение вложенных файлов и директорий #}
+function build_include(include, go_back) {
+    var master = document.getElementById('tree');
+    var tbl = document.createElement('table');
+    tbl.style.width = '100%';
+    var tbdy = document.createElement('tbody');
+    if (go_back) {
+        return_path(tbdy)
+    }
+    var i;
+    for (i=0; i < include.length; i++) {
+        var tr = document.createElement('tr');
+        tr.className = "blinking";
+        var tmp_obj  = include[i][0];
+        if (tmp_obj['filename']) {
+            add_onClick(tr, tmp_obj['filename'])
+            build_tr_td('file_download',tmp_obj['filename'],tr)
+        } else {
+            add_onClick(tr, tmp_obj['directoryname'])
+            build_tr_td('folder',tmp_obj['directoryname'],tr)
+        }
+        tbdy.appendChild(tr);
+    }
+    tbl.appendChild(tbdy);
+    master.appendChild(tbl)
+}
+
+{# Функция создания кнопки #}
+function create_btn(td,name,cls,func) {
+    var btn = document.createElement('button');
+    btn.type = "button";
+    btn.setAttribute("onClick", func);
+    btn.className = cls;
+    btn.appendChild(document.createTextNode(name));
+    td.appendChild(btn);
+}
+
+{# Функция для построения информации о файле #}
+function build_file(info, go_back){
+    var master = document.getElementById('tree');
+    var tbl = document.createElement('table');
+    tbl.style.width = '100%';
+    var tbdy = document.createElement('tbody');
+    if (go_back) {
+        return_path(tbdy);
+    }
+    var tr = document.createElement('tr');
+    var td = document.createElement('td');
+    create_btn(td,"Скачать","btn btn-primary","download_file()");
+    create_btn(td,"Удалить","btn btn-danger","delete_file()");
+    tr.appendChild(td);
+
+    var td = document.createElement('td');
+    td.appendChild(document.createTextNode("Размер: " +  bytesToSize(info['stat'][6])));
+    tr.appendChild(td);
+    tbdy.appendChild(tr);
+    tbl.appendChild(tbdy);
+    master.appendChild(tbl);
+}
+
+{# Функция построения заголовка #}
+function build_header(master, data) {
+    var tbl = document.createElement('table');
+    tbl.style.width = '100%';
+    var tbdy = document.createElement('tbody');
+    var tr = document.createElement('tr');
+    var name = data['file_path'] || data['directory_path'] || '.'
+    if (data['file_path']) {
+        var td = document.createElement('td');
+        build_icon(td,'file_download');
+        tr.appendChild(td)
+
+        var td = document.createElement('td');
+        var row = document.createElement('div');
+        row.className = "row";
+        var div = document.createElement('div');
+        div.className = "col-6";
+        div.appendChild(document.createTextNode(name));
+        row.appendChild(div);
+        td.appendChild(row);
+        tr.appendChild(td);
+    } else {
+        var td = document.createElement('td');
+        build_icon(td,'folder');
+        tr.appendChild(td);
+
+        var td = document.createElement('td');
+        var row = document.createElement('div');
+        row.className = "row";
+        var div = document.createElement('div');
+        div.className = "col-6";
+        div.appendChild(document.createTextNode(name));
+        row.appendChild(div);
+        var div = document.createElement('div');
+        div.className = "col-6";
+        create_btn(div,"Удалить","btn btn-danger btn-block","delete_file()");
+        row.appendChild(div);
+        td.appendChild(row);
+        tr.appendChild(td);
+    }
+    tbdy.appendChild(tr);
+    tbl.appendChild(tbdy);
+    master.appendChild(tbl);
+}
+
+{# Функция построения окончания #}
+function build_footer(master, form_check) {
+    var tbl = document.createElement('table');
+    tbl.style.width = '100%';
+    var tbdy = document.createElement('tbody');
+    if (form_check) {
+        var tr = document.createElement('tr');
+        var td = document.createElement('td');
+        build_icon(td,"file_upload");
+        tr.appendChild(td);
+        build_form(tr,"upload_file","FilePath","SubmitFile","Загрузить файл","form-control-file","file","uf(event)");
+        tbdy.appendChild(tr);
+
+        var tr = document.createElement('tr');
+        var td = document.createElement('td');
+        build_icon(td,"create_new_folder");
+        tr.appendChild(td);
+        build_form(tr,"create_directory","DirPath","SubmitDir","Создать директорию","form-control","text","ud(event)");
+        tbdy.appendChild(tr);
+    }
+    tbl.appendChild(tbdy);
+    master.appendChild(tbl);
+}
+
+{# Функция проверки изменений #}
+var hashSum;
+function checkHash() {
+    $.ajax({
+        url:'/api/v2/directory/hash',
+        type:'get',
+        data: {
+            path: "."
+        },
+        timeout: 30000,
+        error: function(){
+            show_msg("Не удалось проверить изменения. Сервер ответил: " + this.status,"alert alert-danger");
+        },
+        success:function(result){
+            if (!result['error']) {
+                var newHash = result['data'];
+                if (newHash != hashSum) {
+                    hashSum = newHash;
+                    getTree(false);
+                }
+            }
+        }
+    });
+}
+
+{# Функция получения данных о директории #}
+function getTree(build_all) {
+    var urlParams = new URLSearchParams(window.location.search)
+    $.ajax({
+        url:'/api/v2/directory/list',
+        type:'get',
+        data: {
+            path: urlParams.get('path') || "."
+        },
+        timeout: 30000,
+        error: function(){
+            show_msg("Не удалось получить информацию о директории. Сервер ответил: " + this.status,"alert alert-danger");
+        },
+        success:function(result){
+            document.getElementById('tree').innerHTML = ""
+            document.getElementById('tree_header').innerHTML = ""
+            if (build_all) {
+                document.getElementById('tree_footer').innerHTML = ""
+            }
+
+            var master = document.getElementById('tree_header');
+            build_header(master,result['data']);
+            var master = document.getElementById('tree_footer');
+            if (result['data']["directoryname"] || result['data']["filename"] ) {
+                go_back = true;
+            } else {
+                go_back = false;
+            }
+            if (result['data']['file_path']) {
+                build_file(result['data'], go_back);
+                if (build_all) {
+                    build_footer(master, false);
+                }
+            } else {
+                build_include(result['data']['include'], go_back);
+                if (build_all) {
+                    build_footer(master, true);
+                }
+            }
+        }
+    });
+}
+
+{# Функция отправки формы создания файла #}
+function uf(e){
+    var urlParams = new URLSearchParams(window.location.search);
+    var path = urlParams.get('path') || '.'
+    var fileList = document.getElementById('FilePath');
+    if (fileList.files.length == 1) {
+        var link = '/api/v2/directory?path=' + path + '\\' + fileList.files[0].name
+        upload(link, fileList.files[0]);
+    }
+    e.preventDefault();
+}
+
+function upload(link, file) {
+    var xhr = new XMLHttpRequest();
+    xhr.responseType = 'json';
+    xhr.upload.onprogress = function(event) {
+    }
+    xhr.onload = xhr.onerror = function() {
+        if (this.status == 200) {
+            show_msg(xhr.response['description'],xhr.response['class_description']);
+            checkHash();
+        } else {
+            show_msg("Файл не удалось записать. Сервер ответил: " + this.status,"alert alert-danger");
+        }
+    };
+    xhr.open("POST", link, true);
+    xhr.send(file);
+}
+{# Функция отправки формы создания директории #}
+function ud(e){
+    var urlParams = new URLSearchParams(window.location.search);
+    var directory = document.getElementById('DirPath');
+    if (directory.value) {
+        var path = urlParams.get('path') || '.';
+        $.ajax({
+            url:'/api/v2/directory?directory=1&path=' + path + '\\' + directory.value,
+            type:'post',
+            timeout: 30000,
+            error: function(){
+                show_msg("Не удалось создать директорию. Сервер ответил: " + this.status,"alert alert-danger");
+            },
+            success:function(result){
+                getTree(false);
+                show_msg(result['description'],result['class_description']);
+            }
+        });
+    }
+    e.preventDefault();
+}
+
+{# Функция получения данных о директории: вызывается при загрузке страницы и каждые 5 секунд, сначала проверка изменений #}
+getTree(true);
+setInterval(checkHash, 30000);
+{% endblock %}

@@ -1,0 +1,18 @@
+.treescroll {
+    overflow: auto;
+    border: 1px solid;
+    border-color: #17a2b8;
+    text-align: left;
+    height:200px;
+}
+.treehead {
+    text-align: left;
+}
+
+.treefoot {
+    text-align: left;
+}
+
+.blinking:hover {
+    background-color: #17a2b8;
+}
