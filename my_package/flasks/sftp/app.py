@@ -7,17 +7,19 @@ from flask import Flask, request, jsonify, send_from_directory, render_template
 from .store import WorkingCopy, Sync
 from traceback import format_exc
 
-# Получение переменных
-data_path = (os.environ.get('DB_PATH') or 'data')
-config_path = (os.environ.get('DB_FILE') or '.sftp')
-
 app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = data_path
+
+# Получение переменных
+app.local_vars = {}
+app.local_vars['DB_PATH'] = (os.environ.get('DB_PATH') or 'data')
+app.local_vars['DB_FILE'] = (os.environ.get('DB_FILE') or '.sftp')
+
+app.config['UPLOAD_FOLDER'] = app.local_vars['DB_PATH']
 api = Api(app)
 
 class BaseAPI():
     # Класс для хранения рабочей копии
-    working_copy = WorkingCopy(data_path)
+    working_copy = WorkingCopy(app.local_vars['DB_PATH'])
 
 class HashAPI(Resource, BaseAPI):
     # Класс для получения хеша директории
@@ -140,7 +142,7 @@ class SyncAPI(Resource,BaseAPI):
         if args['remove'].lower() == 'false': args['remove'] = False
         else: args['remove'] = True
 
-        obj = Sync(self.working_copy,config_path)
+        obj = Sync(self.working_copy,app.local_vars['DB_FILE'])
         if args['action'] not in ['to','from']:
             return jsonify({'description':'Указанная операция не поддерживается.',
                             'class_description':"alert alert-danger"})
@@ -180,7 +182,7 @@ class ConfigAPI(Resource):
 
         try:
             data = {'host':args['host'],'port':args['port'],'login':args['login'],'password':args['password']}
-            pickle.dump(data, open(config_path, 'wb'))
+            pickle.dump(data, open(app.local_vars['DB_FILE'], 'wb'))
         except:
             return jsonify({'description': 'Не удалось записать конфигурацию.',
                             'class_description': "alert alert-danger"})
