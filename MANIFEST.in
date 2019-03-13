@@ -2,4 +2,6 @@ include my_package/flasks/accounting/static/*
 include my_package/flasks/accounting/templates/*
 
 include my_package/flasks/sftp/static/*
+include my_package/flasks/sftp/static/js/*
+include my_package/flasks/sftp/static/css/*
 include my_package/flasks/sftp/templates/*
