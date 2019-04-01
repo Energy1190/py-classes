@@ -2,8 +2,9 @@
 # Версия: 2.0
 import os
 import pickle
+from urllib.parse import quote
 from flask_restful import Api, Resource, reqparse
-from flask import Flask, request, jsonify, send_from_directory, render_template
+from flask import Flask, request, jsonify, send_from_directory, render_template, make_response
 from .store import WorkingCopy, Sync
 from traceback import format_exc
 
@@ -50,7 +51,15 @@ class ListAPI(Resource,BaseAPI):
         if not e:
             d, e = self.working_copy.get(path)
             if not e:
-                return send_from_directory(d['directory'],d['filename'],as_attachment=True)
+                d, e = self.working_copy.get(path)
+                if not e:
+                    responce = make_response(send_from_directory(d['directory'],d['filename'],as_attachment=True))
+                    responce.headers["Content-Disposition"] = \
+                        "attachment;" \
+                        "filename*=UTF-8''{utf_filename}".format(
+                            utf_filename=quote(path.encode('utf-8'))
+                        )
+                    return responce
         return jsonify({'data': d, 'error': e})
 
     def get(self):
@@ -76,7 +85,13 @@ class DirectoryAPI(Resource,BaseAPI):
         if not e:
             d, e = self.working_copy.get(path)
             if not e:
-                return send_from_directory(d['directory'],d['filename'],as_attachment=True)
+                responce = make_response(send_from_directory(d['directory'],d['filename'],as_attachment=True))
+                responce.headers["Content-Disposition"] = \
+                    "attachment;" \
+                    "filename*=UTF-8''{utf_filename}".format(
+                        utf_filename=quote(path.encode('utf-8'))
+                    )
+                return responce
         return jsonify({'data': d, 'error': e})
 
     def delete(self):
