@@ -227,5 +227,77 @@ def create_tablespace(conn_string,name,datafiles=[], pdb=False,temporary=False):
         for file in datafiles:
             add(name,file)
 
+def init_database(conn_string, pdb=False, create_user_params=False, create_directory_params=False,
+                  execute_querys=None, tablespaces=None):
+    '''
+        Функция для первичной инициализации базы данных
+        Принимает:
+            conn_string             -    Строка соединения
+            pdb                     -    Указание на контейнерную базу данных (название)
+            create_user_params      -    Параметры для пользователя, при указании True - создается
+                                         с настройками по умолчанию
+            create_directory_params -    Параметры для директории, при указании True - создается
+                                         с настройками по умолчанию
+            execute_querys          -    Список запросов, которые необходимо выполнить,
+                                         при указании True - выполняются запросы по умолчанию
+    '''
 
+    user_name = ''
+    if create_user_params and hasattr(create_user_params, 'get'):
+        user_name = create_user_params.get('name')
+        user_pass = create_user_params.get('password')
+        user_grants = create_user_params.get('grants')
+        create_user(conn_string, user_name, user_pass, grants=user_grants, pdb=pdb, force=True)
+    elif create_user_params:
+        user_name = 'exporter'
+        user_pass = 'exporter'
+        user_grants = ['SYSDBA','ALL PRIVILEGES','DATAPUMP_IMP_FULL_DATABASE',
+                       'DATAPUMP_EXP_FULL_DATABASE','IMP_FULL_DATABASE','EXP_FULL_DATABASE']
+        create_user(conn_string, user_name, user_pass, grants=user_grants, pdb=pdb, force=True)
+
+    directory_name = ''
+    if create_directory_params and hasattr(create_directory_params, 'get'):
+        directory_name = create_directory_params.get('name')
+        directory_path = create_directory_params.get('path')
+    elif create_directory_params:
+        directory_name = 'EXPORT'
+        directory_path = 'C:\\export'
+
+    needed_execute_querys = []
+    if execute_querys and type(execute_querys) == list:
+        [needed_execute_querys.append(query) for query in execute_querys]
+    elif execute_querys:
+        needed_execute_querys.append('GRANT EXECUTE ON DBMS_LOCK TO PUBLIC')
+        needed_execute_querys.append('GRANT EXECUTE ON DBMS_PIPE TO PUBLIC')
+        needed_execute_querys.append('GRANT SELECT ON DBA_ROLES TO PUBLIC')
+        needed_execute_querys.append('GRANT SELECT ON DBA_ROLE_PRIVS TO PUBLIC')
+        needed_execute_querys.append('GRANT SELECT ON V_$SESSION TO  PUBLIC')
+        needed_execute_querys.append('GRANT SELECT ON V_$PROCESS TO  PUBLIC')
+        needed_execute_querys.append('GRANT SELECT ON V_$RESERVED_WORDS TO PUBLIC')
+        needed_execute_querys.append('GRANT SELECT ON V_$PROCESS TO  PUBLIC')
+        needed_execute_querys.append('GRANT SELECT ON SESSION_ROLES TO PUBLIC WITH GRANT OPTION')
+
+    if user_name:
+        create_user(conn_string, user_name, user_pass, grants=user_grants, pdb=pdb, force=True)
+
+    if directory_name:
+        create_directory(conn_string, directory_name, directory_path, users=[user_name], pdb=pdb)
+
+    alter = OracleApi(conn_string, pdb=pdb)
+    if needed_execute_querys:
+        [alter._run_query(query) for query in needed_execute_querys]
+
+    if tablespaces:
+        for tablespace in tablespaces:
+            if hasattr(tablespace, 'get'):
+                name = tablespace.get('name')
+                temporary = tablespace.get('temporary')
+                dbf_counter = tablespace.get('count')
+                if tablespace.get('create'):
+                    datafules = ['{}{}.DBF'.format(name,str(num)) for num in range(1,int(dbf_counter)+1)]
+                    create_tablespace(conn_string,name,pdb=pdb,temporary=temporary,datafiles=datafules)
+                elif tablespace.get('alter'):
+                    n = int(tablespace.get('alter'))
+                    datafules = ['{}{}.DBF'.format(name, str(num)) for num in range(1 + n, int(dbf_counter) + 1 + n)]
+                    [alter.add_tablespace_df(name,datafile) for datafile in datafules]
 

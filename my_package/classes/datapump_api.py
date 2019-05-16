@@ -84,3 +84,9 @@ class DatapumpApi():
         output = "Сформирована команда: \n\n {}".format(self.exec_cmd)
         print(output)
         return output
+
+def backup_database(path, username=None, password=None, instance=None, directory='EXPORT'):
+    '''
+    Функция для создания бекапа базы данных
+    '''
+    pass
