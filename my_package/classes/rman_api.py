@@ -136,10 +136,11 @@ class RmanApiExtended(RmanApi):
 
         self.url = url
         self.parameters = dict(vars(args))
-        self.date = datetime.datetime.now().strftime("%d.%m.%Y, %H:%M")
+        self.date = datetime.datetime.now().strftime("%d.%m.%Y-%H:%M")
         if logs:
-            sys.stdout = open('output_log_{}'.format(self.date), 'w')
-            sys.stderr = open('error_log_{}'.format(self.date), 'w')
+            pass
+            #sys.stdout = open('output_log_{}'.format(self.date), 'w')
+            #sys.stderr = open('error_log_{}'.format(self.date), 'w')
 
         super(RmanApiExtended, self).__init__(self.parameters['path'],
                                               self.parameters['username'],
