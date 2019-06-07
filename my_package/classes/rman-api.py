@@ -122,6 +122,7 @@ class RmanApi():
 class RmanApiExtended(RmanApi):
     def __init__(self, parse=sys.argv, logs=None, url=None):
         #super(RmanApiExtended, self).__init__(path, username, password, instance, hostname=hostname, port=port)
+        print('DEBUG INCOMING', parse, logs, url)
         parser = ArgumentParser(add_help=False)
 
         parser.add_argument('instance')
