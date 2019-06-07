@@ -132,7 +132,7 @@ class RmanApiExtended(RmanApi):
 
         parser.add_argument('--port', default='1521')
         parser.add_argument('--hostname', default='localhost')
-        args = parser.parse_args(parse)
+        args, unknown = parser.parse_known_args(parse)
 
         self.url = url
         self.parameters = dict(vars(args))
