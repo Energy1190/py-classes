@@ -1,7 +1,7 @@
 from setuptools import setup, find_packages
 
 setup(name='my_package',
-      version='0.21.1',
+      version='0.22.1',
       description='A set of my classes, functions, projects and web interfaces.',
       url='https://github.com/Energy1190/py-projects',
       author='Energy1190',
