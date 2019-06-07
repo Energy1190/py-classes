@@ -95,7 +95,7 @@ class RmanApi():
         else:
             RunRmanApiError("Операция '{}' не определена.".format(task))
 
-        source = Template(raw).render(**kwargs)
+        source = Template(str(raw)).render(**kwargs)
         self.script_path = os.path.join(self.workdir, 'task.rman')
         self.log_path = (log or os.path.join(self.workdir, 'task.log'))
         try:
@@ -161,3 +161,5 @@ class RmanApiExtended(RmanApi):
                 send(self.url,title='RmanApi - {}'.format(file),msg=stream.read())
                 stream.close()
 
+raw = RmanApi.unpack_template(getattr(RmanTasks, 'backup'))
+print(Template(raw).render({}))
