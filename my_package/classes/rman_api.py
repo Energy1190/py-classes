@@ -20,7 +20,8 @@ class RunRmanApiError(Exception):
 
 
 class StdEmul():
-    def __init__(self,filename=None, func=None, stream=None):
+    def __init__(self,old,filename=None, func=None, stream=None):
+        self.old = old
         self.func = func
         self.stream = stream
         self.filename = filename
@@ -33,13 +34,14 @@ class StdEmul():
         if self.source: self.source.write(args[0])
         if self.func: self.func(args[0],stream=self.stream)
 
+    def flush(self, *args,**kwargs):
+        self.old.flush(*args,**kwargs)
+
 
 class RmanApi():
     '''
         Класс для взаимодействия с командой rman с помощью заранее сгенерированных шаблонов
     '''
-    workdir=None
-    logpath=None
     def compilate_template(string:str):
         return pickle.dumps(string).hex()
 
@@ -50,7 +52,8 @@ class RmanApi():
         self.debug = debug
         self.home_path = path
 
-        if self.logpath: sys.stdout = StdEmul(func=self.msg,stream=self.logpath)
+        if hasattr(self, 'logpath') and self.logpath:
+            sys.stdout = StdEmul(sys.stdout,func=self.msg,stream=self.logpath)
         self.exe_path, error = self._get_program_path()
         if error:
             raise RunRmanApiError("Не опознанная ошибка.")
@@ -92,7 +95,7 @@ class RmanApi():
         if url:
             send(url, title='RmanApi', msg=msg)
 
-        if self.logpath:
+        if hasattr(self, 'logpath') and self.logpath:
             source = (bool(debug) and 'DEBUG') or (bool(url) and 'URL') or (bool(stream) and 'STREAM')
             self.logpath.write('{}: {}\n'.format(source,msg))
 
@@ -190,7 +193,7 @@ class RmanApiExtended(RmanApi):
         if work_dir:
             self.workdir = work_dir
 
-        if logs:
+        if logs and work_dir:
             self.logpath = open(os.path.join(work_dir,'output_log_{}'.format(self.date)), 'w')
 
         super(RmanApiExtended, self).__init__(self.parameters['path'],
