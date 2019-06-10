@@ -1,3 +1,4 @@
+import os
 import sys
 from my_package.classes.rman_api import RmanApiExtended
 
@@ -33,10 +34,10 @@ if __name__ == '__main__':
     debug = pop_arg('--debug',parse)
 
     print('RMAN API: Create task.')
+    exe_location = os.sep.join(parse.pop(0).split(os.sep)[:-1])
     action = parse.pop(0)
-    action = parse.pop(0)
-    
-    cls = RmanApiExtended(parse=parse,logs=logs,url=url,debug=debug)
+
+    cls = RmanApiExtended(parse=parse,logs=logs,url=url,debug=debug,work_dir=exe_location)
     cls.run(action,**kwargs)
 
     print('RMAN API: Send logs.')

@@ -131,7 +131,7 @@ class RmanApi():
             self.remove_temp_file(self.script_path)
 
 class RmanApiExtended(RmanApi):
-    def __init__(self, parse=sys.argv, logs=None, url=None, debug=None):
+    def __init__(self, parse=sys.argv, logs=None, url=None, work_dir=None, debug=None):
         self.debug = debug
         if debug: print('DEBUG INCOMING: parse', parse)
         if debug: print('DEBUG INCOMING: logs', logs)
@@ -167,6 +167,9 @@ class RmanApiExtended(RmanApi):
                                               port=self.parameters['port'],
                                               hostname=self.parameters['hostname'],
                                               debug=self.debug)
+
+        if work_dir:
+            self.workdir = work_dir
 
     def close(self):
         if self.url:
