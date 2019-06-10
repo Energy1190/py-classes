@@ -87,10 +87,10 @@ class RmanApi():
 
     def execute(self, proc):
         if self.debug: print('DEBUG: execute RmanApi: proc:', proc)
-        
+
         CREATE_NO_WINDOW = 0x08000000
         x = subprocess.Popen(
-            [proc], stdout=subprocess.PIPE,
+            proc, stdout=subprocess.PIPE,
             stderr=subprocess.PIPE, creationflags=CREATE_NO_WINDOW)
         return [i.decode(encoding='utf-8') for i in x.stdout], [i.decode(encoding='utf-8') for i in x.stderr]
 
