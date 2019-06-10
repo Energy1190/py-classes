@@ -6,7 +6,7 @@ import subprocess
 from jinja2 import Template
 from traceback import format_exc
 from argparse import ArgumentParser
-
+from my_package.scripts.send_slack_notification import main as send
 
 class RmanTasks():
     '''
@@ -18,19 +18,39 @@ class RmanTasks():
 class RunRmanApiError(Exception):
     pass
 
+
+class StdEmul():
+    def __init__(self,filename=None, func=None, stream=None):
+        self.func = func
+        self.stream = stream
+        self.filename = filename
+
+        self.source = None
+        if self.filename:
+            self.source = open(self.filename, 'w')
+
+    def write(self, *args,**kwargs):
+        if self.source: self.source.write(args[0])
+        if self.func: self.func(args[0],stream=self.stream)
+
+
 class RmanApi():
     '''
         Класс для взаимодействия с командой rman с помощью заранее сгенерированных шаблонов
     '''
+    workdir=None
+    logpath=None
     def compilate_template(string:str):
         return pickle.dumps(string).hex()
 
     def unpack_template(bytecode):
         return pickle.loads(bytes.fromhex(bytecode))
 
-    def __init__(self, path, username, password, instance, hostname="localhost", port="1521",debug=None):
+    def __init__(self, path, username, password, instance, hostname="localhost", port="1521", debug=None):
         self.debug = debug
         self.home_path = path
+
+        if self.logpath: sys.stdout = StdEmul(func=self.msg,stream=self.logpath)
         self.exe_path, error = self._get_program_path()
         if error:
             raise RunRmanApiError("Не опознанная ошибка.")
@@ -44,10 +64,8 @@ class RmanApi():
 
         self.log_path = None
         self.script_path = None
-        self.workdir = os.path.dirname(os.path.abspath(__file__))
-        if self.debug:
-            print('DEBUG: build RmanApi: Done')
-            print('DEBUG: build RmanApi: workdir:', self.workdir)
+        if not self.workdir: self.workdir = os.path.dirname(os.path.abspath(__file__))
+        self.msg('DEBUG: build RmanApi: Done',debug=self.debug)
 
     def _get_program_path(self):
         tmp = ('bin', 'rman.exe')
@@ -63,6 +81,20 @@ class RmanApi():
     def _get_connect_data(self, username, password, instance):
         [ RunRmanApiError("Параметр '{}' не определен.".format(item)) for item in [username,password,instance] if not item]
         return '{}/{}@{}:{}/{}'.format(username,password,self.hostname,self.port,instance)
+
+    def msg(self,msg,debug=None,url=None,stream=None):
+        if debug:
+            print(msg)
+
+        if stream:
+            stream.write(msg + '\n')
+
+        if url:
+            send(url, title='RmanApi', msg=msg)
+
+        if self.logpath:
+            source = (bool(debug) and 'DEBUG') or (bool(url) and 'URL') or (bool(stream) and 'STREAM')
+            self.logpath.write('{}: {}\n'.format(source,msg))
 
     def create_temp_file(self, path, source):
         try:
@@ -86,7 +118,7 @@ class RmanApi():
         return '{} TARGET {} cmdfile="{}" log="{}"'.format(self.exe_path,self.conn_string,self.script_path,self.log_path)
 
     def execute(self, proc):
-        if self.debug: print('DEBUG: execute RmanApi: proc:', proc)
+        self.msg('DEBUG: execute RmanApi: proc: {}'.format(proc), debug=self.debug)
 
         CREATE_NO_WINDOW = 0x08000000
         x = subprocess.Popen(
@@ -95,7 +127,7 @@ class RmanApi():
         return [i.decode(encoding='utf-8') for i in x.stdout], [i.decode(encoding='utf-8') for i in x.stderr]
 
     def run(self, task, log=None, **kwargs):
-        if self.debug: print('DEBUG: run RmanApi: task:', task)
+        self.msg('DEBUG: run RmanApi: task: {}'.format(task), debug=self.debug)
         raw = None
         if hasattr(RmanTasks, task):
             raw = RmanApi.unpack_template(getattr(RmanTasks, task))
@@ -103,13 +135,13 @@ class RmanApi():
             RunRmanApiError("Операция '{}' не определена.".format(task))
 
         source = Template(str(raw)).render(**kwargs)
-        if self.debug: print('DEBUG: run RmanApi: source:', source)
+        self.msg('DEBUG: run RmanApi: source: {}'.format(source), debug=self.debug)
 
         self.script_path = os.path.join(self.workdir, 'task.rman')
-        if self.debug: print('DEBUG: run RmanApi: script_path:', self.script_path)
+        self.msg('DEBUG: run RmanApi: script_path: {}'.format(self.script_path), debug=self.debug)
 
         self.log_path = (log or os.path.join(self.workdir, 'task.log'))
-        if self.debug: print('DEBUG: run RmanApi: log_path:', self.log_path)
+        self.msg('DEBUG: run RmanApi: log_path: {}'.format(self.log_path), debug=self.debug)
 
         try:
             self.create_temp_file(self.script_path,source)
@@ -155,10 +187,11 @@ class RmanApiExtended(RmanApi):
         if debug: print('DEBUG PARAMS: parameters', self.parameters)
         if debug: print('DEBUG PARAMS: date', self.date)
 
+        if work_dir:
+            self.workdir = work_dir
+
         if logs:
-            pass
-            #sys.stdout = open('output_log_{}'.format(self.date), 'w')
-            #sys.stderr = open('error_log_{}'.format(self.date), 'w')
+            self.logpath = open(os.path.join(work_dir,'output_log_{}'.format(self.date)), 'w')
 
         super(RmanApiExtended, self).__init__(self.parameters['path'],
                                               self.parameters['username'],
@@ -168,19 +201,10 @@ class RmanApiExtended(RmanApi):
                                               hostname=self.parameters['hostname'],
                                               debug=self.debug)
 
-        if work_dir:
-            self.workdir = work_dir
 
     def close(self):
-        if self.url:
-            from my_package.scripts.send_slack_notification import main as send
-            try:
-                sys.stdout.flush()
-                sys.stderr.flush()
-            except:
-                pass
-
-            for file in ['output_log_{}'.format(self.date), 'error_log_{}'.format(self.date), self.log_path]:
+        if self.url and self.workdir:
+            for file in [os.path.join(self.workdir,'output_log_{}'.format(self.date)), self.log_path]:
                 stream = open(file,'r')
                 send(self.url,title='RmanApi - {}'.format(file),msg=stream.read())
                 stream.close()

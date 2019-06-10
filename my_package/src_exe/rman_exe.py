@@ -1,5 +1,6 @@
 import os
 import sys
+from traceback import format_exc
 from my_package.classes.rman_api import RmanApiExtended
 
 def pop_arg(name, array):
@@ -24,24 +25,27 @@ def collect_kwargs(array):
     return result
 
 if __name__ == '__main__':
-    print('RMAN API version 0.1. INIT.')
-    parse = sys.argv
+    try:
+        print('RMAN API version 0.1. INIT.')
+        parse = sys.argv
 
-    kwargs = collect_kwargs(parse)
+        kwargs = collect_kwargs(parse)
 
-    url = pop_arg('--slack-url',parse)
-    logs = pop_arg('--log-to-file',parse)
-    debug = pop_arg('--debug',parse)
+        url = pop_arg('--slack-url',parse)
+        logs = pop_arg('--log-to-file',parse)
+        debug = pop_arg('--debug',parse)
 
-    print('RMAN API: Create task.')
-    exe_location = os.sep.join(parse.pop(0).split(os.sep)[:-1])
-    action = parse.pop(0)
+        print('RMAN API: Create task.')
+        exe_location = os.sep.join(parse.pop(0).split(os.sep)[:-1])
+        action = parse.pop(0)
 
-    cls = RmanApiExtended(parse=parse,logs=logs,url=url,debug=debug,work_dir=exe_location)
-    cls.run(action,**kwargs)
+        cls = RmanApiExtended(parse=parse,logs=logs,url=url,debug=debug,work_dir=exe_location)
+        cls.run(action,**kwargs)
 
-    print('RMAN API: Send logs.')
-    cls.close()
+        print('RMAN API: Send logs.')
+        cls.close()
 
-    print('RMAN API: End.')
+        print('RMAN API: End.')
+    except:
+        print('RMAN API: Top level error: Trace:', format_exc())
 
