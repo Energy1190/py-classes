@@ -83,7 +83,7 @@ class RmanApi():
     def _build_query(self):
         [RunRmanApiError("Параметр '{}' не определен.".format(item)) for item in [self.exe_path,self.conn_string,self.script_path,self.log_path] if
          not item]
-        return '{} TARGET {} "{}" log="{}"'.format(self.exe_path,self.conn_string,self.script_path,self.log_path)
+        return '{} TARGET {} cmdfile="{}" log="{}"'.format(self.exe_path,self.conn_string,self.script_path,self.log_path)
 
     def execute(self, proc):
         if self.debug: print('DEBUG: execute RmanApi: proc:', proc)
