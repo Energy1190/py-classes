@@ -34,6 +34,8 @@ if __name__ == '__main__':
 
     print('RMAN API: Create task.')
     action = parse.pop(0)
+    action = parse.pop(0)
+    
     cls = RmanApiExtended(parse=parse,logs=logs,url=url,debug=debug)
     cls.run(action,**kwargs)
 
