@@ -28,7 +28,8 @@ class RmanApi():
     def unpack_template(bytecode):
         return pickle.loads(bytes.fromhex(bytecode))
 
-    def __init__(self, path, username, password, instance, hostname="localhost", port="1521"):
+    def __init__(self, path, username, password, instance, hostname="localhost", port="1521",debug=None):
+        self.debug = debug
         self.home_path = path
         self.exe_path, error = self._get_program_path()
         if error:
@@ -44,6 +45,9 @@ class RmanApi():
         self.log_path = None
         self.script_path = None
         self.workdir = os.path.dirname(os.path.abspath(__file__))
+        if self.debug:
+            print('DEBUG: build RmanApi: Done')
+            print('DEBUG: build RmanApi: workdir:', self.workdir)
 
     def _get_program_path(self):
         tmp = ('bin', 'rman.exe')
@@ -82,6 +86,8 @@ class RmanApi():
         return '{} TARGET {} {} log={}'.format(self.exe_path,self.conn_string,self.script_path,self.log_path)
 
     def execute(self, proc):
+        if self.debug: print('DEBUG: execute RmanApi: proc:', proc)
+        
         CREATE_NO_WINDOW = 0x08000000
         x = subprocess.Popen(
             [proc], stdout=subprocess.PIPE,
@@ -89,6 +95,7 @@ class RmanApi():
         return [i.decode(encoding='utf-8') for i in x.stdout], [i.decode(encoding='utf-8') for i in x.stderr]
 
     def run(self, task, log=None, **kwargs):
+        if self.debug: print('DEBUG: run RmanApi: task:', task)
         raw = None
         if hasattr(RmanTasks, task):
             raw = RmanApi.unpack_template(getattr(RmanTasks, task))
@@ -96,8 +103,14 @@ class RmanApi():
             RunRmanApiError("Операция '{}' не определена.".format(task))
 
         source = Template(str(raw)).render(**kwargs)
+        if self.debug: print('DEBUG: run RmanApi: source:', source)
+
         self.script_path = os.path.join(self.workdir, 'task.rman')
+        if self.debug: print('DEBUG: run RmanApi: script_path:', self.script_path)
+
         self.log_path = (log or os.path.join(self.workdir, 'task.log'))
+        if self.debug: print('DEBUG: run RmanApi: log_path:', self.log_path)
+
         try:
             self.create_temp_file(self.script_path,source)
             stdout, stderr = self.execute(self._build_query())
@@ -118,9 +131,12 @@ class RmanApi():
             self.remove_temp_file(self.script_path)
 
 class RmanApiExtended(RmanApi):
-    def __init__(self, parse=sys.argv, logs=None, url=None):
-        #super(RmanApiExtended, self).__init__(path, username, password, instance, hostname=hostname, port=port)
-        print('DEBUG INCOMING', parse, logs, url)
+    def __init__(self, parse=sys.argv, logs=None, url=None, debug=None):
+        self.debug = debug
+        if debug: print('DEBUG INCOMING: parse', parse)
+        if debug: print('DEBUG INCOMING: logs', logs)
+        if debug: print('DEBUG INCOMING: url', url)
+
         parser = ArgumentParser(add_help=False)
 
         parser.add_argument('instance')
@@ -135,6 +151,10 @@ class RmanApiExtended(RmanApi):
         self.url = url
         self.parameters = dict(vars(args))
         self.date = datetime.datetime.now().strftime("%d.%m.%Y-%H:%M")
+
+        if debug: print('DEBUG PARAMS: parameters', self.parameters)
+        if debug: print('DEBUG PARAMS: date', self.date)
+
         if logs:
             pass
             #sys.stdout = open('output_log_{}'.format(self.date), 'w')
@@ -145,7 +165,8 @@ class RmanApiExtended(RmanApi):
                                               self.parameters['password'],
                                               self.parameters['instance'],
                                               port=self.parameters['port'],
-                                              hostname=self.parameters['hostname'])
+                                              hostname=self.parameters['hostname'],
+                                              debug=self.debug)
 
     def close(self):
         if self.url:
@@ -160,6 +181,3 @@ class RmanApiExtended(RmanApi):
                 stream = open(file,'r')
                 send(self.url,title='RmanApi - {}'.format(file),msg=stream.read())
                 stream.close()
-
-raw = RmanApi.unpack_template(getattr(RmanTasks, 'backup'))
-print(Template(raw).render({}))
