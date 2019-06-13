@@ -22,7 +22,7 @@ class RunRmanApiError(Exception):
 
 class StdEmul():
     def __init__(self,old,filename=None, func=None, stream=None):
-        self.value = StringIO
+        self.value = StringIO()
         sys.stdout = self.value
 
         self.old = old
