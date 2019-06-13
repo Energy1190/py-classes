@@ -7,6 +7,7 @@ from jinja2 import Template
 from traceback import format_exc
 from argparse import ArgumentParser
 from my_package.scripts.send_slack_notification import main as send
+from io import StringIO
 
 class RmanTasks():
     '''
@@ -21,6 +22,9 @@ class RunRmanApiError(Exception):
 
 class StdEmul():
     def __init__(self,old,filename=None, func=None, stream=None):
+        self.value = StringIO
+        sys.stdout = self.value
+
         self.old = old
         self.func = func
         self.stream = stream
@@ -35,7 +39,7 @@ class StdEmul():
         if self.func: self.func(args[0],stream=self.stream)
 
     def flush(self, *args,**kwargs):
-        self.old.flush(*args,**kwargs)
+        return self.value.getvalue()
 
 
 class RmanApi():
@@ -50,10 +54,11 @@ class RmanApi():
 
     def __init__(self, path, username, password, instance, hostname="localhost", port="1521", debug=None):
         self.debug = debug
+        self.outputIO = None
         self.home_path = path
 
         if hasattr(self, 'logpath') and self.logpath:
-            sys.stdout = StdEmul(sys.stdout,func=self.msg,stream=self.logpath)
+            self.outputIO = StdEmul(sys.stdout,func=self.msg,stream=self.logpath)
         self.exe_path, error = self._get_program_path()
         if error:
             raise RunRmanApiError("Не опознанная ошибка.")
@@ -206,6 +211,8 @@ class RmanApiExtended(RmanApi):
 
 
     def close(self):
+        output = self.outputIO.flush()
+        self.outputIO.write(output)
         if self.url and self.workdir:
             for file in [os.path.join(self.workdir,'output_log_{}'.format(self.date)), self.log_path]:
                 stream = open(file,'r')
