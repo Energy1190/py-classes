@@ -1,7 +1,8 @@
 import os
 import sys
+import datetime
 from traceback import format_exc
-from my_package.classes.rman_api import RmanApiExtended
+from my_package.classes.rman_api import QueryParser
 
 def pop_arg(name, array):
     result = None
@@ -25,27 +26,17 @@ def collect_kwargs(array):
     return result
 
 if __name__ == '__main__':
+    date = datetime.datetime.now().strftime("%d.%m.%Y-%H:%M")
+    exe_location = ''
     try:
-        print('RMAN API version 0.1. INIT.')
         parse = sys.argv
-
         kwargs = collect_kwargs(parse)
-
-        url = pop_arg('--slack-url',parse)
-        logs = pop_arg('--log-to-file',parse)
         debug = pop_arg('--debug',parse)
-
-        print('RMAN API: Create task.')
         exe_location = os.sep.join(parse.pop(0).split(os.sep)[:-1])
-        action = parse.pop(0)
-
-        cls = RmanApiExtended(parse=parse,logs=logs,url=url,debug=debug,work_dir=exe_location)
-        cls.run(action,**kwargs)
-
-        print('RMAN API: Send logs.')
-        cls.close()
-
-        print('RMAN API: End.')
+        cls = QueryParser(parse,parse,debug=debug,workdir=exe_location)
+        rman,action = cls.create()
+        rman.run(action,**kwargs)
+        rman.close()
     except:
-        print('RMAN API: Top level error: Trace:', format_exc())
-
+        with open(os.path.join(exe_location,'critical_error_report_{}'.format(date)),'w') as stream:
+            stream.write(format_exc())
