@@ -221,7 +221,7 @@ class QueryParser():
                               self.parameters['username'],
                               self.parameters['password'],
                               self.parameters['instance'],
-                              url=self.parameters['slack-url'],
+                              url=self.parameters.get('slack-url'),
                               port=self.parameters['port'],
                               hostname=self.parameters['hostname'],
                               workdir=self.workdir,

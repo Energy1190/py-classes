@@ -29,6 +29,7 @@ def collect_kwargs(array):
 
 
 if __name__ == '__main__':
+    cls = None
     date = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M")
     exe_location = ''
     try:
@@ -43,3 +44,6 @@ if __name__ == '__main__':
     except:
         with open(os.path.join(exe_location,'critical_error_report_{}'.format(date)), 'w') as stream:
             stream.write(format_exc())
+
+        if hasattr(cls,'logger'):
+            cls.logger.write()
