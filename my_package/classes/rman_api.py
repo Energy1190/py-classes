@@ -89,7 +89,7 @@ class RmanApi():
         # Построение запроса для выполнения
         [RunRmanApiError("Параметр '{}' не определен.".format(item)) for item in [self.path_exe,self.conn_string,self.path_script,self.path_log] if
          not item]
-        return '{} TARGET {} cmdfile="{}" log="{}"'.format(self.path_exe,self.conn_string,self.path_script,self.path_exe)
+        return '{} TARGET {} cmdfile="{}" log="{}"'.format(self.path_exe,self.conn_string,self.path_script,self.path_log)
 
     def execute(self, proc):
         # Выполнение запроса
