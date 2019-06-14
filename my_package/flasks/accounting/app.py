@@ -14,7 +14,11 @@ from .support_functions import *
 from flask import Flask, render_template, url_for, Response, request, jsonify
 
 app = Flask(__name__)
+
+# Получение переменных
 app.local_vars = {}
+app.local_vars['DB_PATH'] = (os.environ.get('DB_PATH') or 'data')
+app.local_vars['DB_FILE'] = (os.environ.get('DB_FILE') or '.db')
 
 CACHE = None
 DATABASE = None

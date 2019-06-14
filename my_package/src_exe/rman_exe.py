@@ -39,11 +39,11 @@ if __name__ == '__main__':
         exe_location = os.sep.join(parse.pop(0).split(os.sep)[:-1])
         cls = QueryParser(parse, debug=debug, workdir=exe_location)
         rman, action = cls.create()
-        rman.run(action, **kwargs)
-        rman.close()
+        try:
+            rman.run(action, **kwargs)
+        finally:
+            rman.close()
     except:
         with open(os.path.join(exe_location,'critical_error_report_{}'.format(date)), 'w') as stream:
             stream.write(format_exc())
 
-        if hasattr(cls,'logger'):
-            cls.logger.write()
