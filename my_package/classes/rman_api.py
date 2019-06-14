@@ -149,7 +149,7 @@ class RmanApiExtended(RmanApi):
 
     def execute(self, proc):
         self.logger.debuger('RmanApiExtended: execute: Init: proc: "{}"'.format(proc))
-        stdout, stderr = super(RmanApiExtended, self).run(proc)
+        stdout, stderr = super(RmanApiExtended, self).execute(proc)
         self.logger.debuger('RmanApiExtended: execute: stdout: "{}"'.format('\n'.join(stdout)))
         self.logger.debuger('RmanApiExtended: execute: stderr: "{}"'.format('\n'.join(stderr)))
         self.logger.debuger('RmanApiExtended: execute: Done')
@@ -221,7 +221,7 @@ class QueryParser():
                               self.parameters['username'],
                               self.parameters['password'],
                               self.parameters['instance'],
-                              url=self.parameters.get('slack-url'),
+                              url=self.parameters.get('slack_url'),
                               port=self.parameters['port'],
                               hostname=self.parameters['hostname'],
                               workdir=self.workdir,
