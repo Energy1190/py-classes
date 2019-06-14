@@ -176,7 +176,7 @@ class QueryParser():
         Класс для обработки входящих данных
     '''
     def __init__(self, incoming:list, debug=False, workdir=None):
-        self.date = datetime.datetime.now().strftime("%d.%m.%Y-%H:%M")
+        self.date = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M")
 
         self.debug = debug
         self.workdir = workdir

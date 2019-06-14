@@ -29,7 +29,7 @@ def collect_kwargs(array):
 
 
 if __name__ == '__main__':
-    date = datetime.datetime.now().strftime("%d.%m.%Y-%H:%M")
+    date = datetime.datetime.now().strftime("%d-%m-%Y_%H-%M")
     exe_location = ''
     try:
         parse = sys.argv
@@ -41,12 +41,5 @@ if __name__ == '__main__':
         rman.run(action, **kwargs)
         rman.close()
     except:
-        #filename = os.path.join(exe_location, 'critical_error_report_{}'.format(date))
-        #stream = open(filename, 'w')
-        #stream.write(format_exc())
-        #stream.close()
         with open(os.path.join(exe_location,'critical_error_report_{}'.format(date)), 'w') as stream:
-            print("%s" % format_exc(), stream)
-
-        raise
-    
+            stream.write(format_exc())
