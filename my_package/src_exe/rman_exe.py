@@ -39,6 +39,8 @@ if __name__ == '__main__':
         exe_location = os.sep.join(parse.pop(0).split(os.sep)[:-1])
         cls = QueryParser(parse, debug=debug, workdir=exe_location)
         rman, action = cls.create()
+        with open(os.path.join(exe_location,'critical_error_report_{}'.format(date)), 'w') as stream:
+            stream.write(str(action) + str((cls.parameters)))
         try:
             rman.run(action, **kwargs)
         finally:
