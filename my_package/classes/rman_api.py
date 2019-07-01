@@ -288,8 +288,12 @@ class Logger():
             array += files
 
         big_stream = ''
+        char_counter = 0
         for filename in array:
             with open(filename,'r') as stream:
+                if len(big_stream) and (len(big_stream + stream.read())) > 1800:
+                    send(url, title='RmanApi - report - {}'.format(self.date), msg=big_stream)
+                    big_stream = ''
                 big_stream += stream.read()
                 big_stream += '\n\n'
 
