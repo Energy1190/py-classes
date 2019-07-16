@@ -40,7 +40,12 @@ if __name__ == '__main__':
         cls = QueryParser(parse, debug=debug, workdir=exe_location)
         rman, action = cls.create()
         try:
-            rman.run(action, **kwargs)
+            if action == 'backup_task':
+                rman.run('backup', **kwargs)
+                rman.run('obsolete', **kwargs)
+                rman.run('delete', **kwargs)
+            else:
+                rman.run(action, **kwargs)
         finally:
             rman.close()
     except:
